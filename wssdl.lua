@@ -16,58 +16,61 @@
 
 local wssdl = {}
 
-function wssdl:field_type(t, basesz)
-  return function (_, s)
+wssdl.field_type = function (t, basesz)
+  return function (s)
     return { size = function () return s * basesz end, type = t }
   end
 end
 
-wssdl.bits  = wssdl:field_type ("bits", 1)
-wssdl.bytes = wssdl:field_type ("bytes", 8)
-wssdl.sint  = wssdl:field_type ("signed", 1)
-wssdl.uint  = wssdl:field_type ("unsigned", 1)
-wssdl.float = wssdl:field_type ("float", 8)
+wssdl.bits  = wssdl.field_type ("bits", 1)
+wssdl.bytes = wssdl.field_type ("bytes", 8)
+wssdl.sint  = wssdl.field_type ("signed", 1)
+wssdl.uint  = wssdl.field_type ("unsigned", 1)
+wssdl.float = wssdl.field_type ("float", 8)
 
-wssdl.bit  = wssdl:bits(1)
+wssdl.bit  = wssdl.bits(1)
 
-wssdl.i8  = wssdl:sint(8)
-wssdl.i16 = wssdl:sint(16)
-wssdl.i32 = wssdl:sint(32)
-wssdl.i64 = wssdl:sint(64)
+wssdl.i8  = wssdl.sint(8)
+wssdl.i16 = wssdl.sint(16)
+wssdl.i32 = wssdl.sint(32)
+wssdl.i64 = wssdl.sint(64)
 
-wssdl.u8  = wssdl:uint(8)
-wssdl.u16 = wssdl:uint(16)
-wssdl.u32 = wssdl:uint(32)
-wssdl.u64 = wssdl:uint(64)
+wssdl.u8  = wssdl.uint(8)
+wssdl.u16 = wssdl.uint(16)
+wssdl.u32 = wssdl.uint(32)
+wssdl.u64 = wssdl.uint(64)
 
-wssdl.f32 = wssdl:float(4)
-wssdl.f64 = wssdl:float(8)
+wssdl.f32 = wssdl.float(4)
+wssdl.f64 = wssdl.float(8)
 
-print(wssdl:bytes(4).size())
+print(wssdl.bytes(4).size())
 
 wssdl.packet = {
 
   __create = function (pkt, params)
-    return params
-  end;
+    local obj = {}
+    obj.fields = params
 
-  __size = function (pkt)
-    local sz = 0
-    if type(pkt.size) == 'function' then
-      for k, v in pairs(pkt.fields) do
-        sz = sz + v._size()
+    obj.size = function (pkt)
+        local sz = 0
+        if type(pkt.size) == 'function' then
+          for k, v in pairs(pkt.fields) do
+            sz = sz + v:size()
+          end
+        else
+          sz = tonumber(pkt.size)
+        end
+        if pkt.padding ~= nil and pkt.padding > 0 then
+          -- no bitwise ops, we align up the old way
+          local rem = sz % pkt.padding
+          if rem > 0 then
+            sz = sz - rem + pkt.padding
+          end
+        end
+        return sz
       end
-    else
-      sz = tonumber(pkt.size)
-    end
-    if pkt.padding > 0 then
-      -- no bitwise ops, we align up the old way
-      local rem = sz % pkt.padding
-      if rem > 0 then
-        sz = sz - rem + pkt.padding
-      end
-    end
-    return sz
+
+    return obj
   end;
 
   _padded = function (pkt, pad)
@@ -93,7 +96,7 @@ setmetatable(wssdl.packet, {
         setmetatable(clone, getmetatable(t))
 
         field(clone, ...)
-        return clone.__create
+        return clone
       end
     end
   end;

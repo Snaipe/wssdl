@@ -28,4 +28,5 @@ tcp = wssdl.packet
   reserved    = wssdl.bits(3),
   flags       = tcp_flags,
   window_size = wssdl.u16,
+  options     = tcp_options,
 }
