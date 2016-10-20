@@ -108,9 +108,8 @@ wssdl._packet = {
           return pkt
         end
 
-        if not params._noclone then
+        if not pkt._properties.noclone then
           pkt = deepcopy(pkt)
-          params['_noclone'] = nil
         end
 
         for i, v in ipairs(pkt._definition) do
@@ -401,5 +400,87 @@ setmetatable(wssdl, {
   end;
 
 })
+
+function wssdl.dissector(pkt, proto)
+  local dissect_pkt = nil
+
+  dissect_pkt = function(pkt, start, buf, pinfo, tree)
+    local idx = start
+    local pktval = {}
+
+    for i, field in ipairs(pkt._definition) do
+
+      local sz = #field
+
+      if type(sz) ~= 'number' then
+        pkt:eval(pktval)
+        sz = #field
+      end
+
+      if type(sz) ~= 'number' then
+        error('wssdl: Cannot evaluate value for field ' .. field.name .. '.')
+      end
+
+      local val = nil
+      local rawval = buf(math.floor(idx / 8), math.ceil(sz / 8))
+      local protofield = ProtoField.none(tostring(i) .. '_' .. field.name, field.name, field.description or field.name)
+
+      if field.type == 'packet' then
+        local subtree = tree:add(protofield, rawval, rawval:bytes())
+        _, val = dissect_pkt(field.packet, idx % 8, rawval, pinfo, subtree)
+      elseif field.type == 'bits' then
+        val = rawval:bitfield(idx % 8, sz)
+      else
+        if idx % 8 > 0 then
+          if field.type == 'bytes' or sz > 64 then
+            error ('Unaligned "bytes" fields are not supported')
+          end
+          local corr = {
+            signed   = '>i',
+            unsigned = '>I',
+            float    = '>f',
+          }
+          local packed = Struct.pack('>I' .. tostring(sz / 8), rawval:bitfield(idx % 8, sz))
+          local fmt = corr[field.type]
+          if field.type ~= 'float' then
+            fmt = fmt .. tostring(sz / 8)
+          end
+
+          val = Struct.unpack(fmt, packed)
+        else
+          local corr = {
+            signed   = 'int',
+            unsigned = 'uint',
+            bytes    = 'bytes',
+            float    = 'float',
+          }
+          val = rawval[corr[field.type]](rawval)
+        end
+      end
+
+      if field.type ~= 'packet' then
+        tree:add(protofield, rawval, val)
+      end
+      pktval[field.name] = val
+
+      idx = idx + sz
+    end
+
+    return idx, pktval
+  end
+
+  return function(buf, pinfo, tree)
+    local pkt = deepcopy(pkt)
+
+    -- Don't clone the packet definition further when evaluating
+    pkt._properties.noclone = true
+
+    pinfo.cols.protocol = proto.name
+    local subtree = tree:add(proto, buf(), proto.description)
+
+    local len, _ = dissect_pkt(pkt, 0, buf, pinfo, subtree)
+    return math.ceil(len / 8)
+  end
+end
 
 return wssdl
