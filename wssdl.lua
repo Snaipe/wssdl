@@ -80,6 +80,8 @@ wssdl.field_types = {
   f64 = wssdl.field_type_sized("float", 64);
 }
 
+local make_fields = nil
+
 wssdl._packet = {
 
   _properties = {
@@ -129,6 +131,14 @@ wssdl._packet = {
 
         return pkt
       end;
+
+      protocol = function (pkt, name, description)
+        local proto = Proto.new(name, description)
+        make_fields(proto.fields, pkt, string.lower(name) .. '.')
+        proto.dissector = wssdl.dissector(pkt, proto)
+        return proto
+      end
+
     }
 
     newpacket._lookup = {}
@@ -401,10 +411,60 @@ setmetatable(wssdl, {
 
 })
 
+make_fields = function (fields, pkt, prefix)
+  local prefix = prefix or ''
+
+  for i, field in ipairs(pkt._definition) do
+    local ftype = nil
+    if field.type == 'packet' then
+      make_fields(fields, field.packet, prefix .. field.name .. '.')
+      ftype = ftypes.STRING
+    elseif field.type == 'bits' then
+      local len = #field
+      if type(len) == number then
+        local tname = 'UINT' .. tostring(math.ceil(len / 8) * 8)
+        ftype = ftypes[tname]
+      else
+        ftype = ftypes.BYTES
+      end
+    elseif field.type == 'float' then
+      local len = #field
+      if type(len) ~= 'number' then
+        error('wssdl: Cannot compute size of primitive field ' .. field.name .. '.')
+      end
+      if len == 4 then
+        ftype = ftypes.FLOAT
+      else
+        ftype = ftypes.DOUBLE
+      end
+    else
+      local corr = {
+        signed   = 'INT',
+        unsigned = 'UINT',
+        bytes    = 'BYTES',
+      }
+
+      local tname = corr[field.type]
+      if field.type == 'signed' or field.type == 'unsigned' then
+        local len = #field
+        if type(len) ~= 'number' then
+          error('wssdl: Cannot compute size of primitive field ' .. field.name .. '.')
+        end
+        tname = tname .. tostring(len)
+      end
+
+      ftype = ftypes[tname]
+    end
+
+    fields[prefix .. field.name] = ProtoField.new(field.name, prefix .. field.name, ftype, nil, nil, nil, field.description)
+  end
+end
+
 function wssdl.dissector(pkt, proto)
   local dissect_pkt = nil
 
-  dissect_pkt = function(pkt, start, buf, pinfo, tree)
+  dissect_pkt = function(pkt, prefix, start, buf, pinfo, tree)
+    local prefix = prefix or ''
     local idx = start
     local pktval = {}
 
@@ -423,18 +483,20 @@ function wssdl.dissector(pkt, proto)
 
       local val = nil
       local rawval = buf(math.floor(idx / 8), math.ceil(sz / 8))
-      local protofield = ProtoField.none(tostring(i) .. '_' .. field.name, field.name, field.description or field.name)
+      local protofield = proto.fields[prefix .. field.name]
 
       if field.type == 'packet' then
-        local subtree = tree:add(protofield, rawval, rawval:bytes())
-        _, val = dissect_pkt(field.packet, idx % 8, rawval, pinfo, subtree)
+        local subtree = tree:add(protofield, rawval, '')
+        _, val = dissect_pkt(field.packet, prefix .. field.name .. '.', idx % 8, rawval, pinfo, subtree)
       elseif field.type == 'bits' then
         val = rawval:bitfield(idx % 8, sz)
+      elseif field.type == 'bytes' then
+        if idx % 8 > 0 then
+          error ('Unaligned "bytes" fields are not supported')
+        end
+        val = tostring(rawval:bytes())
       else
         if idx % 8 > 0 then
-          if field.type == 'bytes' or sz > 64 then
-            error ('Unaligned "bytes" fields are not supported')
-          end
           local corr = {
             signed   = '>i',
             unsigned = '>I',
@@ -451,7 +513,6 @@ function wssdl.dissector(pkt, proto)
           local corr = {
             signed   = 'int',
             unsigned = 'uint',
-            bytes    = 'bytes',
             float    = 'float',
           }
           val = rawval[corr[field.type]](rawval)
@@ -478,7 +539,7 @@ function wssdl.dissector(pkt, proto)
     pinfo.cols.protocol = proto.name
     local subtree = tree:add(proto, buf(), proto.description)
 
-    local len, _ = dissect_pkt(pkt, 0, buf, pinfo, subtree)
+    local len, _ = dissect_pkt(pkt, string.lower(proto.name) .. '.', 0, buf, pinfo, subtree)
     return math.ceil(len / 8)
   end
 end
