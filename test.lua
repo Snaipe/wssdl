@@ -31,9 +31,5 @@ tcp = wssdl.packet
   options     : bytes((data_offset - 5) * 4);
 }
 
-custom_proto = Proto.new('custom_tcp', 'custom tcp header')
-
-custom_proto.dissector = wssdl.dissector(tcp, custom_proto)
-
+custom_proto = tcp:protocol('custom_tcp', 'custom tcp header')
 DissectorTable.get("udp.port"):add(5005, custom_proto)
-
