@@ -421,7 +421,7 @@ make_fields = function (fields, pkt, prefix)
       ftype = ftypes.STRING
     elseif field.type == 'bits' then
       local len = #field
-      if type(len) == number then
+      if type(len) == 'number' then
         local tname = 'UINT' .. tostring(math.ceil(len / 8) * 8)
         ftype = ftypes[tname]
       else
