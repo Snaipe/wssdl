@@ -425,7 +425,7 @@ make_fields = function (fields, pkt, prefix)
         local tname = 'UINT' .. tostring(math.ceil(len / 8) * 8)
         ftype = ftypes[tname]
       else
-        ftype = ftypes.BYTES
+        ftype = ftypes.UINT64
       end
     elseif field.type == 'float' then
       local len = #field
@@ -489,6 +489,9 @@ function wssdl.dissector(pkt, proto)
         local subtree = tree:add(protofield, rawval, '')
         _, val = dissect_pkt(field.packet, prefix .. field.name .. '.', idx % 8, rawval, pinfo, subtree)
       elseif field.type == 'bits' then
+        if sz > 64 then
+          error('wssdl: "bits" field ' .. field.name .. ' is larger than 64 bits, which is not supported by wireshark.')
+        end
         val = rawval:bitfield(idx % 8, sz)
       elseif field.type == 'bytes' then
         if idx % 8 > 0 then
