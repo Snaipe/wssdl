@@ -100,6 +100,20 @@ wssdl.field_types = {
   oct = format_specifier('octal');
   dec = format_specifier('decimal');
   hex = format_specifier('hexadecimal');
+
+  description = {
+    _imbue = function(field, desc)
+      field._description = desc
+      return field
+    end
+  };
+
+  name = {
+    _imbue = function(field, str)
+      field._displayname = str
+      return field
+    end
+  };
 }
 
 local make_fields = nil
