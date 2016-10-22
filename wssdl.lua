@@ -78,6 +78,14 @@ wssdl.field_types = {
 
   f32 = wssdl.field_type_sized("float", 32);
   f64 = wssdl.field_type_sized("float", 64);
+
+  bool = {
+    _imbue = function (field, s)
+      field._size = (s or 1)
+      field.type = "bool"
+      return field
+    end
+  };
 }
 
 local make_fields = nil
@@ -442,6 +450,7 @@ make_fields = function (fields, pkt, prefix)
         signed   = 'INT',
         unsigned = 'UINT',
         bytes    = 'BYTES',
+        bool     = 'BOOLEAN',
       }
 
       local tname = corr[field.type]
@@ -488,9 +497,9 @@ function wssdl.dissector(pkt, proto)
       if field.type == 'packet' then
         local subtree = tree:add(protofield, rawval, '')
         _, val = dissect_pkt(field.packet, prefix .. field.name .. '.', idx % 8, rawval, pinfo, subtree)
-      elseif field.type == 'bits' then
+      elseif field.type == 'bits' or field.type == 'bool' then
         if sz > 64 then
-          error('wssdl: "bits" field ' .. field.name .. ' is larger than 64 bits, which is not supported by wireshark.')
+          error('wssdl: "' .. field.type .. '" field ' .. field.name .. ' is larger than 64 bits, which is not supported by wireshark.')
         end
         val = rawval:bitfield(idx % 8, sz)
       elseif field.type == 'bytes' then
