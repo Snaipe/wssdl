@@ -39,7 +39,7 @@ wssdl.field_type = function (type, basesz)
   local o = {
     _imbue = function (field, s)
       field._size = s * basesz
-      field.type = type
+      field._type = type
       return field
     end
   }
@@ -50,7 +50,7 @@ wssdl.field_type_sized = function (type, size)
   local o = {
     _imbue = function (field)
       field._size = size
-      field.type = type
+      field._type = type
       return field
     end
   }
@@ -60,7 +60,7 @@ end
 local format_specifier = function(fmt)
   local o = {
     _imbue = function(field)
-      field.format = fmt
+      field._format = fmt
       return field
     end
   }
@@ -92,7 +92,7 @@ wssdl.field_types = {
   bool = {
     _imbue = function (field, s)
       field._size = (s or 1)
-      field.type = "bool"
+      field._type = "bool"
       return field
     end
   };
@@ -121,8 +121,8 @@ wssdl._packet = {
 
       _imbue = function (field, ...)
         local pkt = newpacket:eval({...})
-        field.type    = "packet"
-        field.packet  = pkt
+        field._type    = "packet"
+        field._packet  = pkt
         field._size   = #pkt
         return field
       end;
@@ -148,7 +148,7 @@ wssdl._packet = {
         -- Recompute lookup
         pkt._lookup = {}
         for i, v in ipairs(pkt._definition) do
-          pkt._lookup[v.name] = i
+          pkt._lookup[v._name] = i
         end
 
         return pkt
@@ -359,6 +359,11 @@ local packetdef_metatable = {}
 local fieldresolver_metatable = {
 
   __index = function(field, k)
+    -- Do not resolve underscore-prefixed fields
+    if string.sub(k, 1, 1) == '_' then
+      return nil
+    end
+
     local type = rawget(wssdl.field_types, k)
     if type == nil then
       type = rawget(wssdl.env, k)
@@ -396,7 +401,7 @@ packetdef_metatable = {
 
   __index = function(t, k)
     local o = {
-      name = k;
+      _name = k;
 
       -- Evaluate the field with concrete values
       _eval = function(field, params)
@@ -438,10 +443,10 @@ make_fields = function (fields, pkt, prefix)
 
   for i, field in ipairs(pkt._definition) do
     local ftype = nil
-    if field.type == 'packet' then
-      make_fields(fields, field.packet, prefix .. field.name .. '.')
+    if field._type == 'packet' then
+      make_fields(fields, field._packet, prefix .. field._name .. '.')
       ftype = ftypes.STRING
-    elseif field.type == 'bits' then
+    elseif field._type == 'bits' then
       local len = #field
       if type(len) == 'number' then
         local tname = 'UINT' .. tostring(math.ceil(len / 8) * 8)
@@ -449,10 +454,10 @@ make_fields = function (fields, pkt, prefix)
       else
         ftype = ftypes.UINT64
       end
-    elseif field.type == 'float' then
+    elseif field._type == 'float' then
       local len = #field
       if type(len) ~= 'number' then
-        error('wssdl: Cannot compute size of primitive field ' .. field.name .. '.')
+        error('wssdl: Cannot compute size of primitive field ' .. field._name .. '.')
       end
       if len == 4 then
         ftype = ftypes.FLOAT
@@ -467,11 +472,11 @@ make_fields = function (fields, pkt, prefix)
         bool     = 'BOOLEAN',
       }
 
-      local tname = corr[field.type]
-      if field.type == 'signed' or field.type == 'unsigned' then
+      local tname = corr[field._type]
+      if field._type == 'signed' or field._type == 'unsigned' then
         local len = #field
         if type(len) ~= 'number' then
-          error('wssdl: Cannot compute size of primitive field ' .. field.name .. '.')
+          error('wssdl: Cannot compute size of primitive field ' .. field._name .. '.')
         end
         tname = tname .. tostring(len)
       end
@@ -480,16 +485,23 @@ make_fields = function (fields, pkt, prefix)
     end
 
     local format = nil
-    if field.format ~= nil then
+    if field._format ~= nil then
       local corr = {
         decimal = base.DEC,
         hexadecimal = base.HEX,
         octal = base.OCT,
       }
-      format = corr[field.format]
+      format = corr[field._format]
     end
 
-    fields[prefix .. field.name] = ProtoField.new(field.name, prefix .. field.name, ftype, nil, format, nil, field.description)
+    fields[prefix .. field._name] = ProtoField.new(
+        field._displayname or field._name,
+        prefix .. field._name,
+        ftype,
+        nil,
+        format,
+        nil,
+        field._description)
   end
 end
 
@@ -511,22 +523,22 @@ function wssdl.dissector(pkt, proto)
       end
 
       if type(sz) ~= 'number' then
-        error('wssdl: Cannot evaluate value for field ' .. field.name .. '.')
+        error('wssdl: Cannot evaluate value for field ' .. field._name .. '.')
       end
 
       local val = nil
       local rawval = buf(math.floor(idx / 8), math.ceil(sz / 8))
-      local protofield = proto.fields[prefix .. field.name]
+      local protofield = proto.fields[prefix .. field._name]
 
-      if field.type == 'packet' then
+      if field._type == 'packet' then
         local subtree = tree:add(protofield, rawval, '')
-        _, val = dissect_pkt(field.packet, prefix .. field.name .. '.', idx % 8, rawval, pinfo, subtree)
-      elseif field.type == 'bits' or field.type == 'bool' then
+        _, val = dissect_pkt(field._packet, prefix .. field._name .. '.', idx % 8, rawval, pinfo, subtree)
+      elseif field._type == 'bits' or field._type == 'bool' then
         if sz > 64 then
-          error('wssdl: "' .. field.type .. '" field ' .. field.name .. ' is larger than 64 bits, which is not supported by wireshark.')
+          error('wssdl: "' .. field._type .. '" field ' .. field._name .. ' is larger than 64 bits, which is not supported by wireshark.')
         end
         val = rawval:bitfield(idx % 8, sz)
-      elseif field.type == 'bytes' then
+      elseif field._type == 'bytes' then
         if idx % 8 > 0 then
           error ('Unaligned "bytes" fields are not supported')
         end
@@ -534,7 +546,7 @@ function wssdl.dissector(pkt, proto)
       else
         if idx % 8 > 0 then
           if sz > 64 then
-            error('wssdl: Unaligned "' .. field.type .. '" field ' .. field.name .. ' is larger than 64 bits, which is not supported by wireshark.')
+            error('wssdl: Unaligned "' .. field._type .. '" field ' .. field._name .. ' is larger than 64 bits, which is not supported by wireshark.')
           end
           local corr = {
             signed   = '>i',
@@ -542,8 +554,8 @@ function wssdl.dissector(pkt, proto)
             float    = '>f',
           }
           local packed = Struct.pack('>I' .. tostring(math.ceil(sz / 8)), rawval:bitfield(idx % 8, sz))
-          local fmt = corr[field.type]
-          if field.type ~= 'float' then
+          local fmt = corr[field._type]
+          if field._type ~= 'float' then
             fmt = fmt .. tostring(math.ceil(sz / 8))
           end
 
@@ -554,14 +566,14 @@ function wssdl.dissector(pkt, proto)
             unsigned = 'uint',
             float    = 'float',
           }
-          val = rawval[corr[field.type]](rawval)
+          val = rawval[corr[field._type]](rawval)
         end
       end
 
-      if field.type ~= 'packet' then
+      if field._type ~= 'packet' then
         tree:add(protofield, rawval, val)
       end
-      pktval[field.name] = val
+      pktval[field._name] = val
 
       idx = idx + sz
     end
