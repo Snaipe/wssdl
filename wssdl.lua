@@ -509,15 +509,18 @@ function wssdl.dissector(pkt, proto)
         val = tostring(rawval:bytes())
       else
         if idx % 8 > 0 then
+          if sz > 64 then
+            error('wssdl: Unaligned "' .. field.type .. '" field ' .. field.name .. ' is larger than 64 bits, which is not supported by wireshark.')
+          end
           local corr = {
             signed   = '>i',
             unsigned = '>I',
             float    = '>f',
           }
-          local packed = Struct.pack('>I' .. tostring(sz / 8), rawval:bitfield(idx % 8, sz))
+          local packed = Struct.pack('>I' .. tostring(math.ceil(sz / 8)), rawval:bitfield(idx % 8, sz))
           local fmt = corr[field.type]
           if field.type ~= 'float' then
-            fmt = fmt .. tostring(sz / 8)
+            fmt = fmt .. tostring(math.ceil(sz / 8))
           end
 
           val = Struct.unpack(fmt, packed)
