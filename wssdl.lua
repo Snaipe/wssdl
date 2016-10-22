@@ -57,6 +57,16 @@ wssdl.field_type_sized = function (type, size)
   return o
 end
 
+local format_specifier = function(fmt)
+  local o = {
+    _imbue = function(field)
+      field.format = fmt
+      return field
+    end
+  }
+  return o
+end
+
 wssdl.field_types = {
   bits  = wssdl.field_type("bits",      1);
   bytes = wssdl.field_type("bytes",     8);
@@ -86,6 +96,10 @@ wssdl.field_types = {
       return field
     end
   };
+
+  oct = format_specifier('octal');
+  dec = format_specifier('decimal');
+  hex = format_specifier('hexadecimal');
 }
 
 local make_fields = nil
@@ -465,7 +479,17 @@ make_fields = function (fields, pkt, prefix)
       ftype = ftypes[tname]
     end
 
-    fields[prefix .. field.name] = ProtoField.new(field.name, prefix .. field.name, ftype, nil, nil, nil, field.description)
+    local format = nil
+    if field.format ~= nil then
+      local corr = {
+        decimal = base.DEC,
+        hexadecimal = base.HEX,
+        octal = base.OCT,
+      }
+      format = corr[field.format]
+    end
+
+    fields[prefix .. field.name] = ProtoField.new(field.name, prefix .. field.name, ftype, nil, format, nil, field.description)
   end
 end
 
