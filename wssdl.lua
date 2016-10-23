@@ -31,6 +31,10 @@ deepcopy = function (o)
   end
 end
 
+local quote = function(s)
+  return '‘' .. s .. '’'
+end
+
 wssdl.init = function (self, env)
   self.env = env
 end
@@ -471,7 +475,7 @@ make_fields = function (fields, pkt, prefix)
     elseif field._type == 'float' then
       local len = #field
       if type(len) ~= 'number' then
-        error('wssdl: Cannot compute size of primitive field ' .. field._name .. '.')
+        error('wssdl: Cannot compute size of primitive ' .. quote(field._name) .. ' field.')
       end
       if len == 4 then
         ftype = ftypes.FLOAT
@@ -490,7 +494,7 @@ make_fields = function (fields, pkt, prefix)
       if field._type == 'signed' or field._type == 'unsigned' then
         local len = #field
         if type(len) ~= 'number' then
-          error('wssdl: Cannot compute size of primitive field ' .. field._name .. '.')
+          error('wssdl: Cannot compute size of primitive ' .. quote(field._name) .. ' field.')
         end
         tname = tname .. tostring(len)
       end
@@ -537,7 +541,7 @@ function wssdl.dissector(pkt, proto)
       end
 
       if type(sz) ~= 'number' then
-        error('wssdl: Cannot evaluate value for field ' .. field._name .. '.')
+        error('wssdl: Cannot evaluate size of ' .. quote(field._name) .. ' field.')
       end
 
       local val = nil
