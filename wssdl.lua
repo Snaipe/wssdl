@@ -37,6 +37,7 @@ end
 
 wssdl.init = function (self, env)
   self.env = env
+  return self
 end
 
 wssdl.field_type = function (type, basesz)
