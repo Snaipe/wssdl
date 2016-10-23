@@ -15,7 +15,7 @@ tcp_flags = wssdl.packet
   fin : bit();
 }
 
-tcp = wssdl.packet
+tcp_hdr = wssdl.packet
   : padding(32)
 {
   src_port    : u16();
@@ -31,5 +31,24 @@ tcp = wssdl.packet
   options     : bytes((data_offset - 5) * 4);
 }
 
+tcp = wssdl.packet
+{
+  header  : tcp_hdr();
+  payload : payload(header.dst_port);
+}
+
+DissectorTable.new('custom_tcp.header.dst_port')
+
 custom_proto = tcp:protocol('custom_tcp', 'custom tcp header')
 DissectorTable.get("udp.port"):add(5005, custom_proto)
+
+foopkt = wssdl.packet
+{
+  foo : u32();
+  bar : u32();
+  baz : u32();
+}
+
+DissectorTable.get("custom_tcp.header.dst_port")
+    :add(1234, foopkt:protocol('fooproto', 'Foo Protocol'))
+
