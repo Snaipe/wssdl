@@ -100,6 +100,28 @@ wssdl.field_types = {
     end
   };
 
+  payload = {
+    _imbue = function(field, cr_expr, size)
+      local criterion = {}
+      if type(cr_expr) == 'string' then
+        -- Split the dot-separated expression into a table
+        local sep, fields = '\\.', {}
+        local pattern = string.format("([^%s]+)", sep)
+        cr_expr:gsub(pattern, function(c) fields[#fields+1] = c end)
+        criterion = fields
+      else
+        while cr_expr do
+          table.insert(criterion, 1, cr_expr._id)
+          cr_expr = cr_expr._parent
+        end
+      end
+      field._dissection_criterion = criterion
+      field._size = size
+      field._type = "payload"
+      return field
+    end
+  };
+
   oct = format_specifier('octal');
   dec = format_specifier('decimal');
   hex = format_specifier('hexadecimal');
@@ -140,7 +162,6 @@ wssdl._packet = {
         local pkt = newpacket:eval({...})
         field._type    = "packet"
         field._packet  = pkt
-        field._size   = #pkt
         return field
       end;
 
@@ -508,7 +529,11 @@ local fieldresolver_metatable = {
   end;
 
   __len = function (field)
-    return field._size
+    if field._packet ~= nil then
+      return #field._packet
+    else
+      return field._size
+    end
   end;
 
 }
@@ -560,8 +585,13 @@ make_fields = function (fields, pkt, prefix)
   for i, field in ipairs(pkt._definition) do
     local ftype = nil
     if field._type == 'packet' then
-      make_fields(fields, field._packet, prefix .. field._name .. '.')
+      -- No need to deepcopy the packet definition since the parent was cloned
+      local pkt = field._packet
+      pkt._properties.noclone = true
+      make_fields(fields, pkt, prefix .. field._name .. '.')
       ftype = ftypes.STRING
+    elseif field._type == 'payload' then
+      ftype = ftypes.PROTOCOL
     elseif field._type == 'bits' then
       local len = #field
       if type(len) == 'number' then
@@ -624,31 +654,57 @@ end
 function wssdl.dissector(pkt, proto)
   local dissect_pkt = nil
 
-  dissect_pkt = function(pkt, prefix, start, buf, pinfo, tree)
+  dissect_pkt = function(pkt, prefix, start, buf, pinfo, tree, root)
     local prefix = prefix or ''
     local idx = start
     local pktval = {}
 
     for i, field in ipairs(pkt._definition) do
 
-      local sz = #field
+      local protofield = proto.fields[prefix .. field._name]
+      local node = nil
+      local sz = nil
+      local val = nil
 
-      if type(sz) ~= 'number' then
+      if field._type == 'packet' then
+        local rawval = buf(math.floor(idx / 8))
+        node = tree:add(protofield, rawval, '')
+        _, val = dissect_pkt(field._packet, prefix .. field._name .. '.', idx % 8, rawval:tvb(), pinfo, node, root)
+      end
+      sz = #field
+
+      if sz and type(sz) ~= 'number' then
         pkt:eval(pktval)
         sz = #field
       end
 
-      if type(sz) ~= 'number' then
+      if sz and type(sz) ~= 'number' then
         error('wssdl: Cannot evaluate size of ' .. quote(field._name) .. ' field.')
       end
 
-      local val = nil
-      local rawval = buf(math.floor(idx / 8), math.ceil(sz / 8))
-      local protofield = proto.fields[prefix .. field._name]
+      if sz == nil then
+        sz = buf:len() * 8 - idx
+      end
+
+      local offlen = math.ceil((sz + idx % 8) / 8)
+      local needed = math.floor(idx / 8) + offlen
+
+      local rawval = buf(0,0)
+      if needed <= buf:len() and sz > 0 then
+        rawval = buf(math.floor(idx / 8), offlen)
+      end
 
       if field._type == 'packet' then
-        local subtree = tree:add(protofield, rawval, '')
-        _, val = dissect_pkt(field._packet, prefix .. field._name .. '.', idx % 8, rawval, pinfo, subtree)
+        node:set_len(offlen)
+      elseif field._type == 'payload' then
+        local dtname = table.concat({string.lower(proto.name), unpack(field._dissection_criterion)}, '.')
+
+        local dt = DissectorTable.get(dtname)
+        local val = pktval
+        for i, v in pairs(field._dissection_criterion) do
+          val = val[v]
+        end
+        dt:try(val, rawval:tvb(), pinfo, root)
       elseif field._type == 'bits' or field._type == 'bool' then
         if sz > 64 then
           error('wssdl: "' .. field._type .. '" field ' .. field._name .. ' is larger than 64 bits, which is not supported by wireshark.')
