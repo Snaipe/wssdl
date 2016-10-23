@@ -225,11 +225,8 @@ wssdl._packet = {
       end
     end
     if pkt._properties.padding > 0 then
-      -- no bitwise ops, we align up the old way
-      local rem = sz % pkt._properties.padding
-      if rem > 0 then
-        sz = sz - rem + pkt._properties.padding
-      end
+      local mask = pkt._properties.padding - 1
+      sz = bit.band(sz + mask, bit.bnot(mask))
     end
     return sz
   end;
@@ -338,6 +335,56 @@ local new_mod_placeholder = new_binop_placeholder (function(self, values)
     return do_eval(self._lhs, values) % do_eval(self._rhs, values)
   end)
 
+-- Bitwise ops
+
+local new_band_placeholder = new_binop_placeholder (function(self, values)
+    return bit.band(do_eval(self._lhs, values), do_eval(self._rhs, values))
+  end)
+
+local new_bor_placeholder = new_binop_placeholder (function(self, values)
+    return bit.bor(do_eval(self._lhs, values), do_eval(self._rhs, values))
+  end)
+
+local new_bxor_placeholder = new_binop_placeholder (function(self, values)
+    return bit.bxor(do_eval(self._lhs, values), do_eval(self._rhs, values))
+  end)
+
+local new_bnot_placeholder = new_valued_placeholder (function(self, values)
+    return bit.bnot(do_eval(self._value, values))
+  end)
+
+local new_lshift_placeholder = new_binop_placeholder (function(self, values)
+    return bit.lshift(do_eval(self._lhs, values), do_eval(self._rhs, values))
+  end)
+
+local new_rshift_placeholder = new_binop_placeholder (function(self, values)
+    return bit.rshift(do_eval(self._lhs, values), do_eval(self._rhs, values))
+  end)
+
+local new_arshift_placeholder = new_binop_placeholder (function(self, values)
+    return bit.arshift(do_eval(self._lhs, values), do_eval(self._rhs, values))
+  end)
+
+local new_rol_placeholder = new_binop_placeholder (function(self, values)
+    return bit.rol(do_eval(self._lhs, values), do_eval(self._rhs, values))
+  end)
+
+local new_ror_placeholder = new_binop_placeholder (function(self, values)
+    return bit.ror(do_eval(self._lhs, values), do_eval(self._rhs, values))
+  end)
+
+local new_bswap_placeholder = new_valued_placeholder (function(self, values)
+    return bit.bswap(do_eval(self._value, values))
+  end)
+
+local new_tobit_placeholder = new_valued_placeholder (function(self, values)
+    return bit.tobit(do_eval(self._value, values))
+  end)
+
+local new_tohex_placeholder = new_binop_placeholder (function(self, values)
+    return bit.tohex(do_eval(self._lhs, values), do_eval(self._rhs, values))
+  end)
+
 placeholder_metatable = {
   __index = function(t, k)
     -- Do not resolve underscore-prefixed fields
@@ -373,6 +420,54 @@ placeholder_metatable = {
 
   __mod = function(lhs, rhs)
     return new_mod_placeholder(lhs, rhs)
+  end;
+
+  __band = function(lhs, rhs)
+    return new_band_placeholder(lhs, rhs)
+  end;
+
+  __bor = function(lhs, rhs)
+    return new_bor_placeholder(lhs, rhs)
+  end;
+
+  __bxor = function(lhs, rhs)
+    return new_bxor_placeholder(lhs, rhs)
+  end;
+
+  __bnot = function(val)
+    return new_bnot_placeholder(val)
+  end;
+
+  __lshift = function(lhs, rhs)
+    return new_lshift_placeholder(lhs, rhs)
+  end;
+
+  __rshift = function(lhs, rhs)
+    return new_rshift_placeholder(lhs, rhs)
+  end;
+
+  __arshift = function(lhs, rhs)
+    return new_arshift_placeholder(lhs, rhs)
+  end;
+
+  __rol = function(lhs, rhs)
+    return new_rol_placeholder(lhs, rhs)
+  end;
+
+  __ror = function(lhs, rhs)
+    return new_ror_placeholder(lhs, rhs)
+  end;
+
+  __bswap = function(val)
+    return new_bswap_placeholder(val)
+  end;
+
+  __tobit = function(val)
+    return new_tobit_placeholder(val)
+  end;
+
+  __tohex = function(val, n)
+    return new_tohex_placeholder(val, n)
   end;
 }
 
@@ -616,5 +711,39 @@ function wssdl.dissector(pkt, proto)
     return math.ceil(len / 8)
   end
 end
+
+-- Patch the bit interface to get metamethods
+local oldbit = bit
+
+bit = {}
+setmetatable(bit, {
+  __index = function(bit, key)
+    -- Shortcut if the key doesn't exist anyway
+    if oldbit[key] == nil then
+      return nil
+    end
+
+    return function(x, ...)
+      local mm = nil
+      if key.sub(1, 1) == 'b' then
+        for i, v in ipairs({x, ...}) do
+          local mt = getmetatable(v)
+          if mt and mt['__' .. key] then
+            mm = mt['__' .. key]
+            break
+          end
+        end
+      else
+        local mt = getmetatable(x)
+        if mt and mt['__' .. key] then
+          mm = mt['__' .. key]
+        end
+      end
+      return (mm or oldbit[key])(x, ...)
+    end
+  end;
+
+  __metatable = false;
+})
 
 return wssdl
