@@ -195,6 +195,12 @@ wssdl._packet = {
       protocol = function (pkt, name, description)
         local proto = Proto.new(name, description)
         make_fields(proto.fields, pkt, string.lower(name) .. '.')
+
+        proto.experts.too_short = ProtoExpert.new(
+            string.lower(name) .. '.too_short.expert',
+            name .. ' message too short',
+            expert.group.MALFORMED, expert.severity.ERROR)
+
         proto.dissector = wssdl.dissector(pkt, proto)
         return proto
       end
@@ -669,7 +675,11 @@ function wssdl.dissector(pkt, proto)
       if field._type == 'packet' then
         local rawval = buf(math.floor(idx / 8))
         node = tree:add(protofield, rawval, '')
-        _, val = dissect_pkt(field._packet, prefix .. field._name .. '.', idx % 8, rawval:tvb(), pinfo, node, root)
+        sz, val = dissect_pkt(field._packet, prefix .. field._name .. '.', idx % 8, rawval:tvb(), pinfo, node, root)
+        -- Handle errors
+        if sz < 0 then
+          return sz
+        end
       end
       sz = #field
 
@@ -690,6 +700,13 @@ function wssdl.dissector(pkt, proto)
       local needed = math.floor(idx / 8) + offlen
 
       local rawval = buf(0,0)
+      if sz > 0 then
+        if needed > buf:len() then
+          tree:add_proto_expert_info(proto.experts.too_short)
+          return -1
+        end
+      end
+
       if needed <= buf:len() and sz > 0 then
         rawval = buf(math.floor(idx / 8), offlen)
       end
@@ -762,7 +779,10 @@ function wssdl.dissector(pkt, proto)
     pinfo.cols.protocol = proto.name
     local subtree = tree:add(proto, buf(), proto.description)
 
-    local len, _ = dissect_pkt(pkt, string.lower(proto.name) .. '.', 0, buf, pinfo, subtree)
+    local len, _ = dissect_pkt(pkt, string.lower(proto.name) .. '.', 0, buf, pinfo, subtree, tree)
+    if len < 0 then
+      return
+    end
     return math.ceil(len / 8)
   end
 end
