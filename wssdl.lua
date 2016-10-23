@@ -82,11 +82,13 @@ wssdl.field_types = {
 
   i8  = wssdl.field_type_sized("signed", 8);
   i16 = wssdl.field_type_sized("signed", 16);
+  i24 = wssdl.field_type_sized("signed", 24);
   i32 = wssdl.field_type_sized("signed", 32);
   i64 = wssdl.field_type_sized("signed", 64);
 
   u8  = wssdl.field_type_sized("unsigned", 8);
   u16 = wssdl.field_type_sized("unsigned", 16);
+  u24 = wssdl.field_type_sized("unsigned", 24);
   u32 = wssdl.field_type_sized("unsigned", 32);
   u64 = wssdl.field_type_sized("unsigned", 64);
 
