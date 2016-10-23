@@ -76,7 +76,6 @@ wssdl.field_types = {
   bytes = wssdl.field_type("bytes",     8);
   int   = wssdl.field_type("signed",    1);
   uint  = wssdl.field_type("unsigned",  1);
-  float = wssdl.field_type("float",     8);
 
   bit = wssdl.field_type_sized("bits", 1);
 
