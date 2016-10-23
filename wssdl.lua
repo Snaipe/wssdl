@@ -110,10 +110,19 @@ wssdl.field_types = {
         cr_expr:gsub(pattern, function(c) fields[#fields+1] = c end)
         criterion = fields
       else
+        local dt_name = nil
+        -- We assume that if the _id member exists, we are dealing with
+        -- a field placeholder. Otherwise, this is a property table
+        if cr_expr._id == nil then
+          dt_name = cr_expr[2] or cr_expr.name
+          cr_expr = cr_expr[1] or cr_expr.criterion
+        end
+
         while cr_expr do
           table.insert(criterion, 1, cr_expr._id)
           cr_expr = cr_expr._parent
         end
+        field._dt_name = dt_name
       end
       field._dissection_criterion = criterion
       field._size = size
@@ -714,7 +723,9 @@ function wssdl.dissector(pkt, proto)
       if field._type == 'packet' then
         node:set_len(offlen)
       elseif field._type == 'payload' then
-        local dtname = table.concat({string.lower(proto.name), unpack(field._dissection_criterion)}, '.')
+        local dtname = field._dt_name or
+            table.concat({string.lower(proto.name),
+                          unpack(field._dissection_criterion)}, '.')
 
         local dt = DissectorTable.get(dtname)
         local val = pktval

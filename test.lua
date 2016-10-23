@@ -34,21 +34,9 @@ tcp_hdr = wssdl.packet
 tcp = wssdl.packet
 {
   header  : tcp_hdr();
-  payload : payload(header.dst_port);
+  payload : payload { header.dst_port, 'tcp.port' };
 }
 
-DissectorTable.new('custom_tcp.header.dst_port')
-
-custom_proto = tcp:protocol('custom_tcp', 'custom tcp header')
-DissectorTable.get("udp.port"):add(5005, custom_proto)
-
-foopkt = wssdl.packet
-{
-  foo : u32();
-  bar : u32();
-  baz : u32();
-}
-
-DissectorTable.get("custom_tcp.header.dst_port")
-    :add(1234, foopkt:protocol('fooproto', 'Foo Protocol'))
-
+-- Let's replace the builtin dissector for TCP!
+DissectorTable.get('ip.proto')
+    :set(0x06, tcp:protocol('TCP', 'Transmission Control Protocol'))
