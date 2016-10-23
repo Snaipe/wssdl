@@ -265,8 +265,8 @@ end
 local new_binop_placeholder = function(eval)
   return function(lhs, rhs)
     local ph = new_placeholder(eval)
-    ph.rhs = rhs
-    ph.lhs = lhs
+    ph._rhs = rhs
+    ph._lhs = lhs
     return ph
   end
 end
@@ -274,72 +274,76 @@ end
 local new_valued_placeholder = function(eval)
   return function(value)
     local ph = new_placeholder(eval)
-    ph.value = value
+    ph._value = value
     return ph
   end
 end
 
 local new_funcall_placeholder = function(func, ...)
   local ph = new_placeholder (function(self, values)
-      return self.func(unpack(self.params))
+      return self._func(unpack(self._params))
     end)
-  ph.func = func
-  ph.params = {...}
+  ph._func = func
+  ph._params = {...}
   return ph
 end
 
 local new_field_placeholder = function(id)
   local ph = new_placeholder (function(self, values)
-      local val = values[self.id]
+      local val = values[self._id]
       if val ~= nil then
         return val
       else
-        return new_field_placeholder(self.id)
+        return new_field_placeholder(self._id)
       end
     end)
-  ph.id = id
+  ph._id = id
   return ph
 end
 
 local new_subscript_placeholder = function(parent, subscript)
   local ph = new_placeholder (function(self, values)
-      return do_eval(self.parent, values)[self.subscript]
+      return do_eval(self._parent, values)[self._id]
     end)
-  ph.parent = parent
-  ph.subscript = subscript
+  ph._parent = parent
+  ph._id = subscript
   return ph
 end
 
 local new_unm_placeholder = new_valued_placeholder (function(self, values)
-    return -do_eval(self.value, values)
+    return -do_eval(self._value, values)
   end)
 
 local new_add_placeholder = new_binop_placeholder (function(self, values)
-    return do_eval(self.lhs, values) + do_eval(self.rhs, values)
+    return do_eval(self._lhs, values) + do_eval(self._rhs, values)
   end)
 
 local new_sub_placeholder = new_binop_placeholder (function(self, values)
-    return do_eval(self.lhs, values) - do_eval(self.rhs, values)
+    return do_eval(self._lhs, values) - do_eval(self._rhs, values)
   end)
 
 local new_mul_placeholder = new_binop_placeholder (function(self, values)
-    return do_eval(self.lhs, values) * do_eval(self.rhs, values)
+    return do_eval(self._lhs, values) * do_eval(self._rhs, values)
   end)
 
 local new_div_placeholder = new_binop_placeholder (function(self, values)
-    return do_eval(self.lhs, values) / do_eval(self.rhs, values)
+    return do_eval(self._lhs, values) / do_eval(self._rhs, values)
   end)
 
 local new_pow_placeholder = new_binop_placeholder (function(self, values)
-    return do_eval(self.lhs, values) ^ do_eval(self.rhs, values)
+    return do_eval(self._lhs, values) ^ do_eval(self._rhs, values)
   end)
 
 local new_mod_placeholder = new_binop_placeholder (function(self, values)
-    return do_eval(self.lhs, values) % do_eval(self.rhs, values)
+    return do_eval(self._lhs, values) % do_eval(self._rhs, values)
   end)
 
 placeholder_metatable = {
   __index = function(t, k)
+    -- Do not resolve underscore-prefixed fields
+    if string.sub(k, 1, 1) == '_' then
+      return nil
+    end
     return new_subscript_placeholder(t, k)
   end;
 
