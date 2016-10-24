@@ -18,29 +18,11 @@
 
 local wssdl = {}
 
-function tprint (tbl, indent)
-  if not indent then indent = 0 end
-  if type(tbl) == 'table' then
-    for k, v in pairs(tbl) do
-      local formatting = string.rep("  ", indent) .. "[" .. tostring(k) .. "]: "
-      if type(v) == "table" then
-        print(formatting)
-        tprint(v, indent+1)
-      elseif type(v) == 'string' then
-        print(formatting .. v)
-      else
-        print(formatting .. tostring(v))
-      end
-    end
-  else
-    print(string.rep("  ", indent) .. tostring(tbl))
-  end
-end
-
 require('wssdl.bit') -- Monkey-patch 'bit' library
 
-local placeholder = require('wssdl.placeholder'):init(wssdl)
-local utils       = require('wssdl.utils')
+local dbg         = require 'wssdl.debug'
+local placeholder = require 'wssdl.placeholder' :init(wssdl)
+local utils       = require 'wssdl.utils'
 
 wssdl.init = function (self, env)
   self.env = env
