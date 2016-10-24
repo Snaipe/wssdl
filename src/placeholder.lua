@@ -16,6 +16,8 @@
 --  You should have received a copy of the GNU General Public License
 --  along with wssdl.  If not, see <http://www.gnu.org/licenses/>.
 
+local specifiers = require 'specifiers'
+
 -- Module
 local placeholder = {}
 
@@ -262,7 +264,7 @@ placeholder.metatable = function(defenv, packetdef_metatable)
         return nil
       end
 
-      local type = rawget(wssdl.field_types, k)
+      local type = rawget(specifiers.field_types, k)
       if type == nil then
         type = rawget(wssdl.env, k)
       end
