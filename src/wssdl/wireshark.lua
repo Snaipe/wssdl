@@ -39,6 +39,8 @@ ws.make_fields = function (fields, pkt, prefix)
         tname = tname .. 'Z'
       end
       ftype = ftypes[tname]
+    elseif field._type == 'address' then
+      ftype = field._size == 32 and ftypes.IPv4 or ftypes.IPv6
     elseif field._type == 'bits' then
       local len = #field
       if type(len) == 'number' then
@@ -176,6 +178,9 @@ ws.dissector = function (pkt, proto)
         end
         val = rawval[mname](rawval)
         sz = #val
+      elseif field._type == 'address' then
+        local mname = field._size == 32 and 'ipv4' or 'ipv6'
+        val = rawval[mname](rawval)
       elseif field._type == 'bits' or field._type == 'bool' then
         if sz > 64 then
           error('wssdl: "' .. field._type .. '" field ' .. field._name .. ' is larger than 64 bits, which is not supported by wireshark.')

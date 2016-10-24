@@ -88,6 +88,13 @@ specifiers.field_types = {
   f32 = type_specifier_sized("float", 32);
   f64 = type_specifier_sized("float", 64);
 
+  ipv4 = type_specifier_sized("address", 32);
+  ipv6 = {
+    _imbue = function()
+      error('wssdl: ipv6 fields aren\'t supported by the wireshark Tvb interface')
+    end
+  };
+
   utf8   = string_type(1, false);
   utf8z  = string_type(1, true);
   utf16  = string_type(2, false);
