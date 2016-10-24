@@ -40,6 +40,21 @@ local type_specifier_sized = function (type, size)
   return o
 end
 
+local string_type = function(basesz, nullterm)
+  return {
+    _imbue = function(field, sz)
+      if nullterm then
+        field._size = 0
+      else
+        field._size = size * basesz
+      end
+      field._type = "string"
+      field._basesz = basesz
+      return field
+    end
+  }
+end
+
 local format_specifier = function(fmt)
   local o = {
     _imbue = function(field)
@@ -72,6 +87,11 @@ specifiers.field_types = {
 
   f32 = type_specifier_sized("float", 32);
   f64 = type_specifier_sized("float", 64);
+
+  utf8   = string_type(1, false);
+  utf8z  = string_type(1, true);
+  utf16  = string_type(2, false);
+  utf16z = string_type(2, true);
 
   bool = {
     _imbue = function (field, s)

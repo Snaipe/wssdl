@@ -6,7 +6,7 @@ WireShark-Specific Dissector Language
 wssdl.packet {
   message     : u8();
   definition  : i32();
-  done        : strz();
+  done        : utf8z();
   easy        : ipv4();
 }
 ```

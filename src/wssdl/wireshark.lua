@@ -33,6 +33,12 @@ ws.make_fields = function (fields, pkt, prefix)
       ftype = ftypes.STRING
     elseif field._type == 'payload' then
       ftype = ftypes.PROTOCOL
+    elseif field._type == 'string' then
+      local tname = 'STRING'
+      if type(field._size) == 'number' and field._size == 0 then
+        tname = tname .. 'Z'
+      end
+      ftype = ftypes[tname]
     elseif field._type == 'bits' then
       local len = #field
       if type(len) == 'number' then
@@ -159,6 +165,17 @@ ws.dissector = function (pkt, proto)
           val = val[v]
         end
         dt:try(val, rawval:tvb(), pinfo, root)
+      elseif field._type == 'string' then
+        local mname = 'string'
+        if type(field._size) == 'number' and field._size == 0 then
+          rawval = buf(math.floor(idx / 8))
+          mname = mname .. 'z'
+        end
+        if field._basesz == 2 then
+          mname = 'u' .. mname
+        end
+        val = rawval[mname](rawval)
+        sz = #val
       elseif field._type == 'bits' or field._type == 'bool' then
         if sz > 64 then
           error('wssdl: "' .. field._type .. '" field ' .. field._name .. ' is larger than 64 bits, which is not supported by wireshark.')

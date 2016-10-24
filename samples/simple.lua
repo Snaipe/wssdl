@@ -4,8 +4,8 @@ foo = wssdl.packet
 {
   foo : u32();
   bar : f64();
-  baz : stringz();
+  baz : utf8z();
 }
 
 DissectorTable.get('udp.port')
-    :set(1234, foo:protocol('foo', 'Foo Protocol'))
+    :set(5005, foo:protocol('foo', 'Foo Protocol'))
