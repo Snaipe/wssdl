@@ -1,0 +1,9 @@
+*
+!*/
+
+!src/*.lua
+!src/**/*.lua
+!*.rst
+!*.md
+
+!.gitignore
