@@ -1,8 +1,11 @@
 -- In this sample, we'll use the DSL to describe what a TCP packet looks like
 -- and use the generated dissector in place of the builtin one.
 --
--- This isn't an extensive replacement for the TCP dissector, but it shows
--- that we can handle more complex definitions.
+-- NOTE: This is a bad idea to do in practice since wireshark expects its
+-- own TCP dissector and might start behaving weirdly or crash.
+--
+-- This isn't an extensive replacement for the builtin TCP dissector, it
+-- simply shows that we can handle more complex packet definitions.
 --
 local wssdl = require("wssdl"):init(_ENV)
 
@@ -49,4 +52,4 @@ tcp = wssdl.packet
 
 -- Let's replace the builtin dissector for TCP!
 DissectorTable.get('ip.proto')
-    :set(0x06, tcp:protocol('TCP', 'Transmission Control Protocol'))
+    :set(0x06, tcp:protocol('wssdl_TCP', 'Transmission Control Protocol (wssdl)'))
