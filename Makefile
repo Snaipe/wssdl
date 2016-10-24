@@ -3,7 +3,7 @@ WS_PLUGIN_DIR := $(HOME)/.config/wireshark/plugins/
 
 bootstrap: wssdl.lua
 
-wssdl.lua:
+wssdl.lua: $(wildcard src/*.lua)
 	$(LUA) pack.lua src > wssdl.lua
 
 install: $(HOME)/.config/wireshark/plugins/ | bootstrap
