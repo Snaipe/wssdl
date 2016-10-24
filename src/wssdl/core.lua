@@ -37,10 +37,10 @@ function tprint (tbl, indent)
   end
 end
 
-require('bit') -- Monkey-patch 'bit' library
+require('wssdl.bit') -- Monkey-patch 'bit' library
 
-local placeholder = require('placeholder'):init(wssdl)
-local utils       = require('utils')
+local placeholder = require('wssdl.placeholder'):init(wssdl)
+local utils       = require('wssdl.utils')
 
 wssdl.init = function (self, env)
   self.env = env

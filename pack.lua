@@ -21,9 +21,9 @@ local fs = require 'lfs'
 
 local args = {...}
 local root = args[1]:gsub('/$', ''):gsub('\\$', '')
+local files = {}
 
 function scandir(root, path)
-  local files = {}
   -- adapted from http://keplerproject.github.com/luafilesystem/examples.html
   path = path or ''
   for file in fs.dir(root..path) do
@@ -49,7 +49,7 @@ function scandir(root, path)
   return files
 end
 
-local files = scandir(root)
+scandir(root)
 
 acc = { [[
 --
@@ -99,7 +99,7 @@ do
   end
 end
 
-return require 'wssdl-core'
+return require 'wssdl.core'
 ]])
 
 print(table.concat(acc))

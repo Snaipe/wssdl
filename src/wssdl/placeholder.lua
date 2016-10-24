@@ -16,7 +16,7 @@
 --  You should have received a copy of the GNU General Public License
 --  along with wssdl.  If not, see <http://www.gnu.org/licenses/>.
 
-local specifiers = require 'specifiers'
+local specifiers = require 'wssdl.specifiers'
 
 -- Module
 local placeholder = {}
