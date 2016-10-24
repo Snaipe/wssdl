@@ -1,0 +1,50 @@
+language: c
+
+sudo: false
+
+env:
+  global:
+    - LUAROCKS=2.3.0
+  matrix:
+    - LUA=lua5.1
+    - LUA=lua5.2
+    - LUA=lua5.3
+
+before_install:
+  - source .ci/setenv_lua.sh
+
+install:
+  - travis_retry luarocks install luafilesystem
+
+script:
+  - make
+
+notifications:
+  email:
+    on_success: change
+    on_failure: always
+
+deploy:
+  provider: releases
+  edge:
+    branch: releases-fix
+  file: wssdl.lua
+  on:
+    repo: diacritic/wssdl
+    tags: true
+    condition: $LUA = 'lua5.2'
+  api_key:
+    secure: >-
+      eWCtuROw1aEHVhsNSl9hMGndNXLioqxFBK/jElSYiXiOsQS5pfXQeDD37
+      sG7/RyPk9VU+GDEbc/of+UCFBGa9ZbOtLzDWcmTnWI0/8GSooKD3kHPtm
+      VoJ+l7pibCq3Q3MB967Twqysy+SG2cgMWPAlqdyfZukaOLnCpw4sKTqkh
+      rpvEMCFLmrjU1FEkbfoboCXc+foP1x9C6NckjAOb6JQv0PORPJubRUkIU
+      pxkJ0AbKs/S2E3c9SugxSOiGVnmkMIN3U87l6JM+tLdQJZssbSO9MJiLs
+      q1hio76CxnC7XzPZWGeQyYEm3DwCyCjWdKdLeDpZ6IwL9plKMKLjtccbf
+      HXHYp3ImWvCr7cBa/tT6N3NjZ/Guh0rulC12mKxtB5thPXO/vInGRLFlq
+      pKbFo73WItuaNLBScC5mSuUhqauumDCpf1ChimDGHcsWESYJ6989IrOMj
+      j16oJG7kvTRnr4Uu/I1Izq7OS3iWPmp+IwO4PIkbAviKUY14ZulI8SVHa
+      ereMN4YeTrkjrnLnWfSQsY89eRd4j3aFJdNsJQM43F50DZYVcjrlHdUA3
+      L6NmdU6n4SzFueGSJNpQc6Q4E72lzSqIu0i6+qeUxNGOE1v2DxlC+3l5T
+      prCxEOmWdI6ZwwUUtUwYnrR9Law65NNr31OGd7U1oowsOcY33fNXCmXo=
+
