@@ -40,25 +40,7 @@ end
 require('bit') -- Monkey-patch 'bit' library
 
 local placeholder = require('placeholder'):init(wssdl)
-
-local deepcopy = function() end
-
-deepcopy = function (o)
-  if type(o) == 'table' then
-    local copy = {}
-    for k, v in pairs(o) do
-      copy[k] = deepcopy(v)
-    end
-    setmetatable(copy, getmetatable(o))
-    return copy
-  else
-    return o
-  end
-end
-
-local quote = function(s)
-  return '‘' .. s .. '’'
-end
+local utils       = require('utils')
 
 wssdl.init = function (self, env)
   self.env = env
@@ -208,7 +190,7 @@ wssdl._packet = {
         end
 
         if not pkt._properties.noclone then
-          pkt = deepcopy(pkt)
+          pkt = utils.deepcopy(pkt)
         end
 
         for i, v in ipairs(pkt._definition) do
@@ -373,7 +355,7 @@ make_fields = function (fields, pkt, prefix)
     elseif field._type == 'float' then
       local len = #field
       if type(len) ~= 'number' then
-        error('wssdl: Cannot compute size of primitive ' .. quote(field._name) .. ' field.')
+        error('wssdl: Cannot compute size of primitive ' .. utils.quote(field._name) .. ' field.')
       end
       if len == 4 then
         ftype = ftypes.FLOAT
@@ -392,7 +374,7 @@ make_fields = function (fields, pkt, prefix)
       if field._type == 'signed' or field._type == 'unsigned' then
         local len = #field
         if type(len) ~= 'number' then
-          error('wssdl: Cannot compute size of primitive ' .. quote(field._name) .. ' field.')
+          error('wssdl: Cannot compute size of primitive ' .. utils.quote(field._name) .. ' field.')
         end
         tname = tname .. tostring(len)
       end
@@ -453,7 +435,7 @@ function wssdl.dissector(pkt, proto)
       end
 
       if sz and type(sz) ~= 'number' then
-        error('wssdl: Cannot evaluate size of ' .. quote(field._name) .. ' field.')
+        error('wssdl: Cannot evaluate size of ' .. utils.quote(field._name) .. ' field.')
       end
 
       if sz == nil then
@@ -537,7 +519,7 @@ function wssdl.dissector(pkt, proto)
   end
 
   return function(buf, pinfo, tree)
-    local pkt = deepcopy(pkt)
+    local pkt = utils.deepcopy(pkt)
 
     -- Don't clone the packet definition further when evaluating
     pkt._properties.noclone = true
