@@ -102,7 +102,8 @@ specifiers.field_types = {
       if t == 'address' and field._size == 128 then
         error('wssdl: Field type can\'t be parsed as Little-Endian', 2)
       end
-      if t == 'signed' or t == 'unsigned' or t == 'float' or t == 'address' then
+      if t == 'signed' or t == 'unsigned' or t == 'float' or t == 'address'
+          or (t == 'string' and field._basesz == 2) then
         if type(field._size) ~= 'number' then
           field._le = true
         else
