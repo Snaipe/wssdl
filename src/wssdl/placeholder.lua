@@ -289,7 +289,7 @@ placeholder.metatable = function(defenv, packetdef_metatable)
       setmetatable(defenv, {
         __index = function(t, k)
           if pktdef[k] == nil then
-            error('wssdl: Unknown symbol ' .. utils.quote(k) .. '.', 3)
+            error('wssdl: Unknown symbol ' .. utils.quote(k) .. '.', 2)
           end
           return new_field_placeholder(k)
         end;

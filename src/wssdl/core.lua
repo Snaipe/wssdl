@@ -160,10 +160,10 @@ packetdef_metatable = {
 
   __index = function(t, k)
     if k:sub(1,1) == '_' then
-      error('wssdl: Invalid identifier for field ' .. utils.quote(k) .. ': Fields must not start with an underscore', 3)
+      error('wssdl: Invalid identifier for field ' .. utils.quote(k) .. ': Fields must not start with an underscore', 2)
     end
     if current_def[k] ~= nil then
-      error('wssdl: Duplicate field ' .. utils.quote(k) .. ' in packet definition.', 3)
+      error('wssdl: Duplicate field ' .. utils.quote(k) .. ' in packet definition.', 2)
     end
 
     local o = {
