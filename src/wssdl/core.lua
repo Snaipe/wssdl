@@ -20,7 +20,6 @@ local wssdl = {}
 
 require('wssdl.bit') -- Monkey-patch 'bit' library
 
-local dbg         = require 'wssdl.debug'
 local placeholder = require 'wssdl.placeholder' :init(wssdl)
 local utils       = require 'wssdl.utils'
 local ws          = require 'wssdl.wireshark'
@@ -137,11 +136,19 @@ wssdl._packet = {
 
 }
 
+local current_def = nil
+
 setmetatable(wssdl._packet, {
 
   __call = function(pkt, ...)
     -- Restore the original global metatable
     setmetatable(_G, nil)
+    for k, v in pairs(current_def) do
+      if k:sub(1,1) ~= '_' then
+        v._pktdef = nil
+      end
+    end
+    current_def = nil
     return pkt._create(pkt, ...)
   end;
 
@@ -152,8 +159,16 @@ local packetdef_metatable = nil
 packetdef_metatable = {
 
   __index = function(t, k)
+    if k:sub(1,1) == '_' then
+      error('wssdl: Invalid identifier for field ' .. utils.quote(k) .. ': Fields must not start with an underscore', 3)
+    end
+    if current_def[k] ~= nil then
+      error('wssdl: Duplicate field ' .. utils.quote(k) .. ' in packet definition.', 3)
+    end
+
     local o = {
       _name = k;
+      _pktdef = current_def;
 
       -- Evaluate the field with concrete values
       _eval = function(field, params)
@@ -163,6 +178,7 @@ packetdef_metatable = {
         return field
       end
     }
+    current_def[k] = o
     setmetatable(o, placeholder.metatable(_G, packetdef_metatable))
     return o
   end;
@@ -181,6 +197,8 @@ setmetatable(wssdl, {
       for k, v in pairs(wssdl._packet._properties) do newprops[k] = v end
       newpacket._properties = newprops
       setmetatable(newpacket, getmetatable(wssdl._packet))
+
+      current_def = { _pktdef = newpacket }
 
       -- Switch to the packet definition metatable
       setmetatable(_G, packetdef_metatable)

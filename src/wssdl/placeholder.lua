@@ -17,6 +17,7 @@
 --  along with wssdl.  If not, see <http://www.gnu.org/licenses/>.
 
 local specifiers = require 'wssdl.specifiers'
+local utils      = require 'wssdl.utils'
 
 -- Module
 local placeholder = {}
@@ -282,9 +283,14 @@ placeholder.metatable = function(defenv, packetdef_metatable)
         end
       })
 
+      local pktdef = field._pktdef
+
       -- Inside a field definition, we switch the resolver
       setmetatable(defenv, {
         __index = function(t, k)
+          if pktdef[k] == nil then
+            error('wssdl: Unknown symbol ' .. utils.quote(k) .. '.', 3)
+          end
           return new_field_placeholder(k)
         end;
       })
