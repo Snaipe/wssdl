@@ -42,7 +42,7 @@ end
 
 local string_type = function(basesz, nullterm)
   return {
-    _imbue = function(field, sz)
+    _imbue = function(field, size)
       if nullterm then
         field._size = 0
       else
