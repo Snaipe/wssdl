@@ -188,7 +188,11 @@ ws.dissector = function (pkt, proto)
           mname = 'u' .. mname
         end
         val = rawval[mname](rawval)
-        sz = #val
+        sz = #val * 8
+
+        if type(field._size) == 'number' and field._size == 0 then
+          sz = sz + field._basesz * 8
+        end
       elseif field._type == 'address' then
         local mname = field._size == 32 and 'ipv4' or 'ipv6'
 
