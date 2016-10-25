@@ -77,4 +77,23 @@ utils.semver = function(ver)
   return t
 end
 
+utils.tvb_ipv6 = function (tvb)
+  local ip = ''
+  for i=0,7 do
+    local n = tvb(i*2,2):uint()
+    if n ~= 0 then
+      if i > 0 and ip == '' then
+        ip = ':'
+      end
+      ip = ip .. string.format('%x', n)
+      if i < 7 then
+        ip = ip .. ':'
+      end
+    elseif i == 7 then
+      ip = ip .. ':'
+    end
+  end
+  return ip
+end
+
 return utils

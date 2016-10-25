@@ -200,22 +200,7 @@ ws.dissector = function (pkt, proto)
         -- their lua API. See https://code.wireshark.org/review/#/c/18442/
         -- for a follow up on the patch to address this
         if utils.semver(get_version()) < utils.semver('2.3.0') and mname == 'ipv6' then
-          val = rawval:bytes()
-          local ip = ''
-          for i=0,7 do
-            local n = rawval(i*2,2):uint()
-            if n ~= 0 then
-              if i > 0 and ip == '' then
-                ip = ':'
-              end
-              ip = ip .. string.format('%x', n)
-              if i < 7 then
-                ip = ip .. ':'
-              end
-            elseif i == 7 then
-              ip = ip .. ':'
-            end
-          end
+          ip = utils.tvb_ipv6(rawval)
           node = tree:add(protofield, rawval, ip, (field._displayname or field._name) .. ': ', ip)
         else
           val = rawval[mname](rawval)
@@ -290,9 +275,9 @@ ws.proto = function (pkt, name, description)
   ws.make_fields(proto.fields, pkt, string.lower(name) .. '.')
 
   proto.experts.too_short = ProtoExpert.new(
-  string.lower(name) .. '.too_short.expert',
-  name .. ' message too short',
-  expert.group.MALFORMED, expert.severity.ERROR)
+      string.lower(name) .. '.too_short.expert',
+      name .. ' message too short',
+      expert.group.MALFORMED, expert.severity.ERROR)
 
   proto.dissector = ws.dissector(pkt, proto)
   return proto
