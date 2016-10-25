@@ -96,6 +96,34 @@ specifiers.field_types = {
   utf16  = string_type(2, false);
   utf16z = string_type(2, true);
 
+  le = {
+    _imbue = function (field)
+      local t = field._type
+      if t == 'address' and field._size == 128 then
+        error('wssdl: Field type can\'t be parsed as Little-Endian', 2)
+      end
+      if t == 'signed' or t == 'unsigned' or t == 'float' or t == 'address' then
+        if type(field._size) ~= 'number' then
+          field._le = true
+        else
+          if field._size > 64 then
+            error('wssdl: Little-Endian fields larger than 64-bits aren\'t supported by Wireshark.', 2)
+          end
+          if field._size % 8 > 0 then
+            error('wssdl: Endianness only makes sense for sizes divisible by 8.', 2)
+          end
+          if field._size <= 8 then
+            error('wssdl: Endianness only makes sense for multiple octets.', 2)
+          end
+          field._le = true
+        end
+      else
+        error('wssdl: Field type can\'t be parsed as Little-Endian', 2)
+      end
+      return field
+    end
+  };
+
   bool = {
     _imbue = function (field, s)
       field._size = (s or 1)
