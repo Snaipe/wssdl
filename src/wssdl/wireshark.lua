@@ -40,7 +40,18 @@ ws.make_fields = function (fields, pkt, prefix)
       end
       ftype = ftypes[tname]
     elseif field._type == 'address' then
-      ftype = field._size == 32 and ftypes.IPv4 or ftypes.IPv6
+      if field._size == 32 then
+        ftype = ftypes.IPv4
+      else
+        -- Older versions of wireshark does not support ipv6 protofields in
+        -- their lua API. See https://code.wireshark.org/review/#/c/18442/
+        -- for a follow up on the patch to address this
+        if utils.semver(get_version()) >= utils.semver('2.3.0') then
+          ftype = ftypes.IPv6
+        else
+          ftype = ftypes.STRING
+        end
+      end
     elseif field._type == 'bits' then
       local len = #field
       if type(len) == 'number' then
@@ -180,7 +191,31 @@ ws.dissector = function (pkt, proto)
         sz = #val
       elseif field._type == 'address' then
         local mname = field._size == 32 and 'ipv4' or 'ipv6'
-        val = rawval[mname](rawval)
+
+        -- Older versions of wireshark does not support ipv6 protofields in
+        -- their lua API. See https://code.wireshark.org/review/#/c/18442/
+        -- for a follow up on the patch to address this
+        if utils.semver(get_version()) < utils.semver('2.3.0') and mname == 'ipv6' then
+          val = rawval:bytes()
+          local ip = ''
+          for i=0,7 do
+            local n = rawval(i*2,2):uint()
+            if n ~= 0 then
+              if i > 0 and ip == '' then
+                ip = ':'
+              end
+              ip = ip .. string.format('%x', n)
+              if i < 7 then
+                ip = ip .. ':'
+              end
+            elseif i == 7 then
+              ip = ip .. ':'
+            end
+          end
+          node = tree:add(protofield, rawval, ip, (field._displayname or field._name) .. ': ', ip)
+        else
+          val = rawval[mname](rawval)
+        end
       elseif field._type == 'bits' or field._type == 'bool' then
         if sz > 64 then
           error('wssdl: "' .. field._type .. '" field ' .. field._name .. ' is larger than 64 bits, which is not supported by wireshark.')
@@ -218,7 +253,7 @@ ws.dissector = function (pkt, proto)
         end
       end
 
-      if field._type ~= 'packet' then
+      if node == nil then
         tree:add(protofield, rawval, val)
       end
       pktval[field._name] = val

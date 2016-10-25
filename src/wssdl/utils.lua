@@ -35,4 +35,46 @@ utils.quote = function (s)
   return '‘' .. s .. '’'
 end
 
+utils.semver = function(ver)
+  ver = ver or ""
+  local t, count = {}, 0
+  ver:gsub("([^%.]+)", function(c)
+    count = count + 1
+    t[count] = tonumber(c) or 0
+  end)
+  t.major = t[1] or 0
+  t.minor = t[2] or 0
+  t.patch = t[3] or 0
+  setmetatable(t, {
+    __newindex = false;
+
+    __lt = function(lhs, rhs)
+      for i, v in ipairs(lhs) do
+        local comp = rhs[i] or 0
+        if v ~= comp then
+          return v < comp
+        end
+      end
+      return false
+    end;
+
+    __le = function(lhs, rhs)
+      return lhs < rhs or lhs == rhs
+    end;
+
+    __eq = function(lhs, rhs)
+      for i, v in ipairs(lhs) do
+        local comp = rhs[i] or 0
+        if v ~= comp then
+          return false
+        end
+      end
+      return true
+    end;
+
+    __metatable = false
+  })
+  return t
+end
+
 return utils
