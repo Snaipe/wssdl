@@ -149,13 +149,15 @@ setmetatable(wssdl._packet, {
   __call = function(pkt, ...)
     -- Restore the original global metatable
     setmetatable(_G, nil)
+    local out = pkt._create(pkt, ...)
+
     for k, v in pairs(current_def) do
       if k:sub(1,1) ~= '_' then
         v._pktdef = nil
       end
     end
     current_def = nil
-    return pkt._create(pkt, ...)
+    return out
   end;
 
 })
