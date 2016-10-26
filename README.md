@@ -21,6 +21,10 @@ wssdl.packet {
 wssdl is a domain specific language on top of lua built for the
 purpose of expressing easily message dissectors.
 
+## Documentation
+
+Coming Soon! For the meantime, check out some of the [samples][samples].
+
 ## Install
 
 ### From the release
@@ -39,3 +43,4 @@ to install it to `~/.config/wireshark/plugins`, or
 `make WS_PLUGIN_DIR=/your/path install` to install it to the path of your choice.
 
 [latest]: https://github.com/diacritic/wssdl/releases/latest
+[samples]: https://github.com/diacritic/wssdl/tree/master/samples
