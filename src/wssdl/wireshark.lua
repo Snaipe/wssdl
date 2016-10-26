@@ -112,171 +112,237 @@ ws.make_fields = function (fields, pkt, prefix)
 end
 
 ws.dissector = function (pkt, proto)
+
+  local tree_add_fields = nil
+
+  tree_add_fields = function(pkt, prefix, tree, pktval)
+    for i, field in ipairs(pkt._definition) do
+      local protofield = proto.fields[prefix .. field._name]
+      local labels = pktval.label[field._name] or {}
+      local val = pktval.val[field._name]
+      local raw = pktval.buf[field._name]
+
+      if field._type == 'packet' then
+        local pktval = { buf = raw, label = labels, val = val }
+        node = tree:add(protofield, raw._self, '', unpack(labels))
+        tree_add_fields(field._packet, prefix .. field._name .. '.', node, pktval)
+      else
+        node = tree:add(protofield, raw, val, unpack(labels))
+      end
+    end
+  end
+
   local dissect_pkt = nil
 
-  dissect_pkt = function(pkt, prefix, start, buf, pinfo, tree, root)
-    local prefix = prefix or ''
+  dissect_pkt = function(pkt, start, buf, pinfo, root)
     local idx = start
-    local pktval = {}
+    local pktval = {
+      buf = {},
+      val = {},
+      label = {}
+    }
 
     for i, field in ipairs(pkt._definition) do
 
-      local protofield = proto.fields[prefix .. field._name]
-      local node = nil
       local sz = nil
+      local raw = nil
       local val = nil
+      local label = nil
 
       if field._type == 'packet' then
-        local rawval = buf(math.floor(idx / 8))
-        node = tree:add(protofield, rawval, '')
-        sz, val = dissect_pkt(field._packet, prefix .. field._name .. '.', idx % 8, rawval:tvb(), pinfo, node, root)
+        raw = buf(math.floor(idx / 8))
+        sz, dseg, val = dissect_pkt(field._packet, idx % 8, raw:tvb(), pinfo, root)
         -- Handle errors
         if sz < 0 then
-          return sz
+          return sz, dseg, val
         end
-      end
-      sz = #field
-
-      if sz and type(sz) ~= 'number' then
-        pkt:eval(pktval)
-        sz = #field
-      end
-
-      if sz and type(sz) ~= 'number' then
-        error('wssdl: Cannot evaluate size of ' .. utils.quote(field._name) .. ' field.')
-      end
-
-      if sz == nil then
-        sz = buf:len() * 8 - idx
-      end
-
-      local offlen = math.ceil((sz + idx % 8) / 8)
-      local needed = math.floor(idx / 8) + offlen
-
-      local rawval = buf(0,0)
-      if sz > 0 then
-        if needed > buf:len() then
-          tree:add_proto_expert_info(proto.experts.too_short)
-          return -1
-        end
-      end
-
-      if needed <= buf:len() and sz > 0 then
-        rawval = buf(math.floor(idx / 8), offlen)
-      end
-
-      if field._type == 'packet' then
-        node:set_len(offlen)
-      elseif field._type == 'payload' then
-        local dtname = field._dt_name or
-            table.concat({string.lower(proto.name),
-                          unpack(field._dissection_criterion)}, '.')
-
-        local dt = DissectorTable.get(dtname)
-        local val = pktval
-        for i, v in pairs(field._dissection_criterion) do
-          val = val[v]
-        end
-        dt:try(val, rawval:tvb(), pinfo, root)
-      elseif field._type == 'string' then
-        local mname = 'string'
-        if type(field._size) == 'number' and field._size == 0 then
-          rawval = buf(math.floor(idx / 8))
-          mname = mname .. 'z'
-        end
-        if field._basesz == 2 then
-          mname = 'u' .. mname
-        end
-        val = rawval[mname](rawval)
-        sz = #val * 8
-
-        if type(field._size) == 'number' and field._size == 0 then
-          sz = sz + field._basesz * 8
-        end
-      elseif field._type == 'address' then
-        local mname = field._size == 32 and 'ipv4' or 'ipv6'
-
-        -- Older versions of wireshark does not support ipv6 protofields in
-        -- their lua API. See https://code.wireshark.org/review/#/c/18442/
-        -- for a follow up on the patch to address this
-        if utils.semver(get_version()) < utils.semver('2.3.0') and mname == 'ipv6' then
-          ip = utils.tvb_ipv6(rawval)
-          node = tree:add(protofield, rawval, ip, (field._displayname or field._name) .. ': ', ip)
-        else
-          val = rawval[mname](rawval)
-        end
-      elseif field._type == 'bits' or field._type == 'bool' then
-        if sz > 64 then
-          error('wssdl: "' .. field._type .. '" field ' .. field._name .. ' is larger than 64 bits, which is not supported by wireshark.')
-        end
-        val = rawval:bitfield(idx % 8, sz)
-      elseif field._type == 'bytes' then
-        if idx % 8 > 0 then
-          error ('Unaligned "bytes" fields are not supported')
-        end
-        val = tostring(rawval:bytes())
+        val.buf._self = buf(math.floor(idx / 8), math.ceil((sz + idx % 8) / 8))
+        raw = val.buf
+        label = val.label
+        val = val.val
       else
-        if idx % 8 > 0 then
+        sz = #field
+
+        if sz and type(sz) ~= 'number' then
+          pkt:eval(pktval.val)
+          sz = #field
+        end
+
+        if sz and type(sz) ~= 'number' then
+          error('wssdl: Cannot evaluate size of ' .. utils.quote(field._name) .. ' field.')
+        end
+
+        if sz == nil then
+          sz = buf:len() * 8 - idx
+        end
+
+        local offlen = math.ceil((sz + idx % 8) / 8)
+        local needed = math.floor(idx / 8) + offlen
+
+        raw = buf(0,0)
+        if sz > 0 then
+          if needed > buf:len() then
+            if pkt._properties.desegment then
+              local desegment = (needed - buf:len()) * 8
+              for j = i + 1, #pkt._definition do
+                local len = #pkt._definition[j]
+                if type(len) ~= 'number' then
+                  return -1, DESEGMENT_ONE_MORE_SEGMENT
+                end
+                desegment = desegment + len
+              end
+              return -1, math.ceil(desegment / 8)
+            else
+              root:add_proto_expert_info(proto.experts.too_short)
+              return -1, 0
+            end
+          end
+        end
+
+        if needed <= buf:len() and sz > 0 then
+          raw = buf(math.floor(idx / 8), offlen)
+        end
+
+        if field._type == 'payload' then
+          local dtname = field._dt_name or
+              table.concat({string.lower(proto.name),
+                            unpack(field._dissection_criterion)}, '.')
+
+          local dt = DissectorTable.get(dtname)
+          local val = pktval.val
+          for i, v in pairs(field._dissection_criterion) do
+            val = val[v]
+          end
+          dt:try(val, raw:tvb(), pinfo, root)
+        elseif field._type == 'string' then
+          local mname = 'string'
+          if type(field._size) == 'number' and field._size == 0 then
+            raw = buf(math.floor(idx / 8))
+            mname = mname .. 'z'
+          end
+          if field._basesz == 2 then
+            mname = 'u' .. mname
+          end
+          val = raw[mname](raw)
+          sz = #val * 8
+
+          if type(field._size) == 'number' and field._size == 0 then
+            sz = sz + field._basesz * 8
+          end
+        elseif field._type == 'address' then
+          local mname = field._size == 32 and 'ipv4' or 'ipv6'
+
+          -- Older versions of wireshark does not support ipv6 protofields in
+          -- their lua API. See https://code.wireshark.org/review/#/c/18442/
+          -- for a follow up on the patch to address this
+          if utils.semver(get_version()) < utils.semver('2.3.0') and mname == 'ipv6' then
+            val = utils.tvb_ipv6(raw)
+            label = {(field._displayname or field._name) .. ': ', val}
+          else
+            val = raw[mname](raw)
+          end
+        elseif field._type == 'bits' or field._type == 'bool' then
           if sz > 64 then
-            error('wssdl: Unaligned "' .. field._type .. '" field ' .. field._name .. ' is larger than 64 bits, which is not supported by wireshark.')
+            error ('wssdl: "' .. field._type .. '" field ' .. field._name .. ' is larger than 64 bits, which is not supported by wireshark.')
           end
+          val = raw:bitfield(idx % 8, sz)
+        elseif field._type == 'bytes' then
+          if idx % 8 > 0 then
+            error ('wssdl: field ' .. utils.quote(field._name) .. ' is an unaligned "bytes" field, which is not supported.')
+          end
+          val = tostring(raw:bytes())
+        elseif field._type ~= 'packet' then
+          if idx % 8 > 0 then
+            if sz > 64 then
+              error('wssdl: Unaligned "' .. field._type .. '" field ' .. field._name .. ' is larger than 64 bits, which is not supported by wireshark.')
+            end
 
-          local prefix = '>'
-          if field._le then
-            prefix = '<'
-          end
+            local prefix = '>'
+            if field._le then
+              prefix = '<'
+            end
 
-          local corr = {
-            signed   = prefix .. 'i',
-            unsigned = prefix .. 'I',
-            float    = prefix .. 'f',
-          }
-          local packed = Struct.pack('>I' .. tostring(math.ceil(sz / 8)), rawval:bitfield(idx % 8, sz))
-          local fmt = corr[field._type]
-          if field._type ~= 'float' then
-            fmt = fmt .. tostring(math.ceil(sz / 8))
-          end
+            local corr = {
+              signed   = prefix .. 'i',
+              unsigned = prefix .. 'I',
+              float    = prefix .. 'f',
+            }
+            local packed = Struct.pack('>I' .. tostring(math.ceil(sz / 8)), raw:bitfield(idx % 8, sz))
+            local fmt = corr[field._type]
+            if field._type ~= 'float' then
+              fmt = fmt .. tostring(math.ceil(sz / 8))
+            end
 
-          val = Struct.unpack(fmt, packed)
-        else
-          local corr = {
-            signed   = 'int',
-            unsigned = 'uint',
-            float    = 'float',
-          }
-          local mname = corr[field._type]
-          if field._le then
-            mname = 'le_' .. mname
+            val = Struct.unpack(fmt, packed)
+          else
+            local corr = {
+              signed   = 'int',
+              unsigned = 'uint',
+              float    = 'float',
+            }
+            local mname = corr[field._type]
+            if field._le then
+              mname = 'le_' .. mname
+            end
+            val = raw[mname](raw)
           end
-          val = rawval[mname](rawval)
         end
       end
 
-      if node == nil then
-        tree:add(protofield, rawval, val)
-      end
-      pktval[field._name] = val
+      pktval.buf[field._name] = raw
+      pktval.val[field._name] = val
+      pktval.label[field._name] = label
 
       idx = idx + sz
     end
 
-    return idx, pktval
+    return idx - start, 0, pktval
   end
 
-  return function(buf, pinfo, tree)
+  local dissect_proto = function (pkt, buf, pinfo, root)
     local pkt = utils.deepcopy(pkt)
 
     -- Don't clone the packet definition further when evaluating
     pkt._properties.noclone = true
 
-    pinfo.cols.protocol = proto.name
-    local subtree = tree:add(proto, buf(), proto.description)
-
-    local len, _ = dissect_pkt(pkt, string.lower(proto.name) .. '.', 0, buf, pinfo, subtree, tree)
+    local len, desegment, val = dissect_pkt(pkt, 0, buf, pinfo, root)
     if len < 0 then
-      return
+      return len, desegment
     end
-    return math.ceil(len / 8)
+
+    pinfo.cols.protocol = proto.name
+    tree_add_fields(pkt, string.lower(proto.name) .. '.', root:add(proto, buf(), proto.description), val)
+
+    return math.ceil(len / 8), desegment
+  end
+
+  return function(buf, pinfo, root)
+    local pktlen = buf:len()
+    local consumed = 0
+
+    if pkt._properties.desegment then
+      while consumed < pktlen do
+        local result, desegment = dissect_proto(pkt, buf(consumed):tvb(), pinfo, root)
+        if result > 0 then
+          consumed = consumed + result
+        elseif result == 0 then
+          return 0
+        elseif desegment ~= 0 then
+          pinfo.desegment_offset = consumed
+          pinfo.desegment_len = desegment
+          return pktlen
+        else
+          return
+        end
+      end
+    else
+      local result = dissect_proto(pkt, buf, pinfo, root)
+      if result < 0 then
+        return
+      end
+      return result
+    end
+    return consumed
   end
 end
 

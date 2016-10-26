@@ -34,8 +34,9 @@ local make_fields = nil
 wssdl._packet = {
 
   _properties = {
-    padding = 0,  -- Padding, in bytes.
-    size = 0,     -- Static size, in bytes.
+    padding = 0,          -- Padding, in bytes.
+    size = 0,             -- Static size, in bytes.
+    desegment = false,    -- Whether the packet should be desegmented or not
   };
 
   _create = function(pkt, def)
@@ -115,6 +116,11 @@ wssdl._packet = {
 
   size = function(pkt, sz)
     pkt._properties.size = sz
+    return pkt
+  end;
+
+  desegment = function(pkt, dseg)
+    pkt._properties.desegment = dseg or true
     return pkt
   end;
 
