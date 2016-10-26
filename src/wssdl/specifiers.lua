@@ -46,7 +46,7 @@ local string_type = function(basesz, nullterm)
       if nullterm then
         field._size = 0
       else
-        field._size = size * basesz
+        field._size = size * basesz * 8
       end
       field._type = "string"
       field._basesz = basesz
