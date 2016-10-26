@@ -18,6 +18,7 @@
 
 local specifiers = require 'wssdl.specifiers'
 local utils      = require 'wssdl.utils'
+local debug      = require 'wssdl.debug'
 
 -- Module
 local placeholder = {}
@@ -257,13 +258,22 @@ placeholder_metatable = {
   end;
 }
 
-placeholder.metatable = function(defenv, packetdef_metatable)
+placeholder.metatable = function(defenv, packetdef_metatable, make_pktfield)
   return {
     __index = function(field, k)
       -- Do not resolve underscore-prefixed fields
       if string.sub(k, 1, 1) == '_' then
         return nil
       end
+
+      if field._name:sub(1,1) == '_' then
+        error('wssdl: Invalid identifier for field ' .. utils.quote(field._name) .. ': Fields must not start with an underscore', 3)
+      end
+      if wssdl._current_def[field._name] ~= nil then
+        error('wssdl: Duplicate field ' .. utils.quote(field._name) .. ' in packet definition.', 3)
+      end
+
+      wssdl._current_def[field._name] = field
 
       local type = rawget(specifiers.field_types, k)
       if type == nil then
@@ -273,20 +283,37 @@ placeholder.metatable = function(defenv, packetdef_metatable)
         return nil
       end
 
+      -- Strip locals from previous field definitions
+      local locals = utils.copy(wssdl._locals)
+      for k, v in pairs(wssdl._current_def) do
+        -- Don't strip internal fields from the locals
+        if k:sub(1,1) ~= '_' then
+          for i = 1, #locals do
+            local l = wssdl._locals[i]
+            if l and l[1] == k then
+              wssdl._locals[i] = nil
+            end
+          end
+        end
+      end
+
       local fieldtype = {}
       setmetatable(fieldtype, {
         __call = function(ft, f, ...)
           -- We finished processing the packet contents ({ field : type() ... })
           -- Restore the packet definition metatable.
-          setmetatable(defenv, packetdef_metatable)
+          local env = setmetatable({}, packetdef_metatable)
+          debug.setfenv(wssdl.fenv, env)
+          -- The user environment is 3 stack levels up
+          wssdl._locals = locals
+          debug.reset_locals(3, nil, make_pktfield)
           return type._imbue(field, ...)
         end
       })
 
       local pktdef = field._pktdef
 
-      -- Inside a field definition, we switch the resolver
-      setmetatable(defenv, {
+      local env = setmetatable({}, {
         __index = function(t, k)
           if pktdef[k] == nil then
             error('wssdl: Unknown symbol ' .. utils.quote(k) .. '.', 2)
@@ -294,12 +321,20 @@ placeholder.metatable = function(defenv, packetdef_metatable)
           return new_field_placeholder(k)
         end;
       })
+
+      -- Inside a field definition, we switch to the resolver context
+      debug.setfenv(wssdl.fenv, env)
+      -- The user environment is 3 stack levels up
+      debug.reset_locals(3, nil, function(ctx, n) return new_field_placeholder(n) end)
+      debug.set_locals(3, wssdl._locals)
+
       return fieldtype
     end;
 
     __len = function (field)
-      if field._packet ~= nil then
-        return #field._packet
+      local packet = rawget(field, '_packet')
+      if packet ~= nil then
+        return #packet
       else
         return field._size
       end

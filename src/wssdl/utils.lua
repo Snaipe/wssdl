@@ -18,6 +18,19 @@
 
 local utils = {}
 
+utils.copy = function (o)
+  if type(o) == 'table' then
+    local copy = {}
+    for k, v in pairs(o) do
+      copy[k] = v
+    end
+    setmetatable(copy, getmetatable(o))
+    return copy
+  else
+    return o
+  end
+end
+
 utils.deepcopy = function (o)
   if type(o) == 'table' then
     local copy = {}

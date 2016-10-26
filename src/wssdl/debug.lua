@@ -20,14 +20,19 @@ local debug = {}
 
 local luadebug = require 'debug'
 
-debug.print = function(tbl, indent)
+debug.print = function(tbl, indent, depth)
+  local depth = depth or 3
+  if depth == 0 then
+    print(string.rep("  ", indent) .. '<snip>')
+    return
+  end
   if not indent then indent = 0 end
   if type(tbl) == 'table' then
     for k, v in pairs(tbl) do
       local formatting = string.rep("  ", indent) .. "[" .. tostring(k) .. "]: "
       if type(v) == "table" then
         print(formatting)
-        debug.print(v, indent+1)
+        debug.print(v, indent+1, depth - 1)
       elseif type(v) == 'string' then
         print(formatting .. v)
       else
@@ -84,45 +89,58 @@ else
   end
 end
 
-debug.get_upvalues = function(fn)
-  if type(fn) == 'number' then
-    fn = luadebug.getinfo(fn).func
-  end
-  local upvalues = {}
-  local i = 1
+debug.traceback = function ()
+  local level = 1
   while true do
-    local name, val = luadebug.getupvalue(fn, i)
-    if not name then
-      break
+    local info = luadebug.getinfo(level, "Sl")
+    if not info then break end
+    if info.what == "C" then
+      print(level, "<native>")
+    else
+      print(level, string.format("[%s]:%d", info.short_src, info.currentline))
     end
-    upvalues[i] = { name, val }
-    i = i + 1
-  end
-  return upvalues
-end
-
-debug.set_upvalues = function(fn, upval)
-  if type(fn) == 'number' then
-    fn = luadebug.getinfo(fn).func
-  end
-  local i = 1
-  while true do
-    local name = luadebug.setupvalue(fn, i, upval[i][2])
-    if not name then
-      break
-    end
-    i = i + 1
+    level = level + 1
   end
 end
 
-debug.reset_upvalues = function(fn)
-  local upvalues = debug.get_upvalues(fn)
-  for i = 1, #upvalues do
-    if upvalues[i][1] ~= '_ENV' then
-      local name = luadebug.setupvalue(fn, i, nil)
-      if not name then
-        break
-      end
+
+debug.get_locals = function(lvl)
+  local locals = {}
+  local i = 1
+  while true do
+    local name, val = luadebug.getlocal(lvl, i)
+    if not name then
+      break
+    end
+    if name ~= '(*temporary)' then
+      locals[i] = { name, val }
+    end
+    i = i + 1
+  end
+  return locals
+end
+
+debug.set_locals = function(lvl, locals)
+  local i = 1
+  while true do
+    if locals[i] == nil then
+      break
+    end
+    local name = luadebug.setlocal(lvl, i, locals[i][2])
+    if not name then
+      break
+    end
+    i = i + 1
+  end
+end
+
+debug.reset_locals = function(lvl, ctx, fn)
+  local locals = debug.get_locals(lvl + 1)
+  for i = 1, #locals do
+    local o = fn(ctx, locals[i][1])
+    local name = luadebug.setlocal(lvl, i, o)
+    if not name then
+      break
     end
   end
 end

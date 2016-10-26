@@ -138,21 +138,24 @@ wssdl._packet = {
 
 }
 
-local current_def = nil
+wssdl._current_def = nil
 
 setmetatable(wssdl._packet, {
 
   __call = function(pkt, ...)
     -- Restore the original global metatable
-    setmetatable(_G, nil)
+    debug.setfenv(wssdl.fenv, wssdl.env)
+    -- The user environment is 3 stack levels up
+    debug.set_locals(3, wssdl._locals)
+
     local out = pkt._create(pkt, ...)
 
-    for k, v in pairs(current_def) do
+    for k, v in pairs(wssdl._current_def) do
       if k:sub(1,1) ~= '_' then
         v._pktdef = nil
       end
     end
-    current_def = nil
+    wssdl._current_def = nil
     return out
   end;
 
@@ -160,30 +163,36 @@ setmetatable(wssdl._packet, {
 
 local packetdef_metatable = nil
 
+local make_packetdef_placeholder
+
+make_packetdef_placeholder = function(t, k)
+
+  local o = {
+    _name = k;
+    _pktdef = wssdl._current_def;
+
+    -- Evaluate the field with concrete values
+    _eval = function(field, params)
+      for k, v in pairs(field) do
+        field[k] = placeholder.do_eval(v, params)
+      end
+      return field
+    end
+  }
+  setmetatable(o, placeholder.metatable(_G, packetdef_metatable, make_packetdef_placeholder))
+  return o
+end;
+
 packetdef_metatable = {
 
   __index = function(t, k)
-    if k:sub(1,1) == '_' then
-      error('wssdl: Invalid identifier for field ' .. utils.quote(k) .. ': Fields must not start with an underscore', 2)
-    end
-    if current_def[k] ~= nil then
-      error('wssdl: Duplicate field ' .. utils.quote(k) .. ' in packet definition.', 2)
-    end
+    local o = make_packetdef_placeholder(t, k)
 
-    local o = {
-      _name = k;
-      _pktdef = current_def;
+    -- Restore the original global metatable
+    debug.setfenv(wssdl.fenv, wssdl.env)
+    -- The user environment is 3 stack levels up
+    debug.set_locals(3, wssdl._locals)
 
-      -- Evaluate the field with concrete values
-      _eval = function(field, params)
-        for k, v in pairs(field) do
-          field[k] = placeholder.do_eval(v, params)
-        end
-        return field
-      end
-    }
-    current_def[k] = o
-    setmetatable(o, placeholder.metatable(_G, packetdef_metatable))
     return o
   end;
 
@@ -191,41 +200,56 @@ packetdef_metatable = {
 
 local dissectdef_metatable = nil
 
+local make_dissectdef_placeholder
+
+make_dissectdef_placeholder = function(ctx, k)
+  local o = {
+    _path = { k };
+  }
+
+  setmetatable(o, {
+
+    __index = function(t, k)
+      -- Restore the original global metatable
+      debug.setfenv(wssdl.fenv, wssdl.env)
+      -- The user environment is 3 stack levels up
+      debug.set_locals(3, wssdl._locals)
+
+      t._path[#t._path + 1] = k
+      return t
+    end;
+
+    __call = function(t, _, params)
+      local method = t._path[#t._path]
+      t._path[#t._path] = nil
+      local tname = table.concat(t._path, '.')
+      local dt = DissectorTable.get(tname)
+      for k, v in pairs(params) do
+        dt[method](dt, k, v)
+      end
+      -- Switch to the dissect definition metatable
+      local env = setmetatable({}, dissectdef_metatable())
+      debug.setfenv(wssdl.fenv, env)
+      -- The user environment is 3 stack levels up
+      wssdl._locals = debug.get_locals(3)
+      debug.reset_locals(3, nil, make_dissectdef_placeholder)
+    end;
+
+  })
+  return o
+end
+
 dissectdef_metatable = function(newdissect)
   return {
 
     __index = function(t, k)
-      local o = {
-        _path = { k };
-      }
+      local o = make_dissectdef_placeholder(t, k)
 
       -- Restore the original global metatable
       debug.setfenv(wssdl.fenv, wssdl.env)
-      debug.reset_upvalues(wssdl.fenv, wssdl._upvalues)
+      -- The user environment is 3 stack levels up
+      debug.set_locals(3, wssdl._locals)
 
-      setmetatable(o, {
-
-        __index = function(t, k)
-          t._path[#t._path + 1] = k
-          return t
-        end;
-
-        __call = function(t, _, params)
-          local method = t._path[#t._path]
-          t._path[#t._path] = nil
-          local tname = table.concat(t._path, '.')
-          local dt = DissectorTable.get(tname)
-          for k, v in pairs(params) do
-            dt[method](dt, k, v)
-          end
-          -- Switch to the dissect definition metatable
-          local env = setmetatable({}, dissectdef_metatable())
-          wssdl._upvalues = debug.get_upvalues(wssdl.fenv)
-          debug.setfenv(wssdl.fenv, env)
-          debug.reset_upvalues(wssdl.fenv)
-        end;
-
-      })
       return o
     end;
 
@@ -245,10 +269,14 @@ setmetatable(wssdl, {
       newpacket._properties = newprops
       setmetatable(newpacket, getmetatable(wssdl._packet))
 
-      current_def = { _pktdef = newpacket }
+      wssdl._current_def = { _pktdef = newpacket }
 
       -- Switch to the packet definition metatable
-      setmetatable(_G, packetdef_metatable)
+      local env = setmetatable({}, packetdef_metatable)
+      debug.setfenv(wssdl.fenv, env)
+      -- The user environment is 3 stack levels up
+      wssdl._locals = debug.get_locals(3)
+      debug.reset_locals(3, nil, make_packetdef_placeholder)
       return newpacket
     elseif k == 'dissect' then
       local newdissect = {}
@@ -258,6 +286,7 @@ setmetatable(wssdl, {
         __call = function(dissect, ...)
           -- Restore the original global metatable
           debug.setfenv(wssdl.fenv, wssdl.env)
+          debug.set_locals(3, wssdl._locals)
           return nil
         end;
 
@@ -266,8 +295,10 @@ setmetatable(wssdl, {
       -- Switch to the dissect definition metatable
       local env = setmetatable({}, dissectdef_metatable(newdissect))
       debug.setfenv(wssdl.fenv, env)
-      newdissect._upvalues = debug.get_upvalues(wssdl.fenv)
-      debug.reset_upvalues(wssdl.fenv)
+
+      -- The user environment is 3 stack levels up
+      wssdl._locals = debug.get_locals(3)
+      debug.reset_locals(3, nil, make_dissectdef_placeholder)
 
       return newdissect
     end
