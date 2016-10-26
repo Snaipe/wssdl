@@ -83,7 +83,7 @@ wssdl._packet = {
 
     newpacket._lookup = {}
     for i, v in ipairs(def) do
-      newpacket._lookup[v.name] = i
+      newpacket._lookup[v._name] = i
     end
 
     newpacket.fields = {}

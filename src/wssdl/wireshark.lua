@@ -372,8 +372,23 @@ ws.proto = function (pkt, name, description)
           table.concat({string.lower(proto.name),
                         unpack(field._dissection_criterion)}, '.')
 
+      local criterion = field._dissection_criterion
+      local target = pkt
+      local j = 1
+      for k, v in pairs(criterion) do
+        local tfield = target._definition[target._lookup[v]]
+        if j < #criterion then
+          if tfield._type ~= 'packet' then
+            error('wssdl: DissectorTable key ' .. utils.quote(dtname) .. ' does not match a field', 2)
+          end
+          target = tfield._packet
+        else
+          target = tfield
+        end
+        j = j + 1
+      end
       if not known_dissectors[dtname] then
-        DissectorTable.new(dtname, nil, field._ftype)
+        DissectorTable.new(dtname, nil, target._ftype)
         known_dissectors[dtname] = true
       end
     end
