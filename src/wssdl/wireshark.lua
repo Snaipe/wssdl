@@ -20,6 +20,15 @@ local ws = {}
 
 local utils = require 'wssdl.utils'
 
+local known_dissectors = {}
+
+do
+  local dissectors = DissectorTable.list()
+  for i, v in ipairs(dissectors) do
+    known_dissectors[v] = true
+  end
+end
+
 ws.make_fields = function (fields, pkt, prefix)
   local prefix = prefix or ''
 
@@ -108,6 +117,8 @@ ws.make_fields = function (fields, pkt, prefix)
         format,
         nil,
         field._description)
+
+    field._ftype = ftype
   end
 end
 
@@ -354,6 +365,19 @@ ws.proto = function (pkt, name, description)
       string.lower(name) .. '.too_short.expert',
       name .. ' message too short',
       expert.group.MALFORMED, expert.severity.ERROR)
+
+  for i, field in ipairs(pkt._definition) do
+    if field._type == 'payload' then
+      local dtname = field._dt_name or
+          table.concat({string.lower(proto.name),
+                        unpack(field._dissection_criterion)}, '.')
+
+      if not known_dissectors[dtname] then
+        DissectorTable.new(dtname, nil, field._ftype)
+        known_dissectors[dtname] = true
+      end
+    end
+  end
 
   proto.dissector = ws.dissector(pkt, proto)
   return proto
