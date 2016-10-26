@@ -1,4 +1,4 @@
-local wssdl = require("wssdl"):init(_ENV)
+local wssdl = require 'wssdl'
 
 foo = wssdl.packet
 {
@@ -7,5 +7,8 @@ foo = wssdl.packet
   baz : utf8z();
 }
 
-DissectorTable.get('udp.port')
-    :set(5005, foo:protocol('foo', 'Foo Protocol'))
+wssdl.dissect {
+  tcp.port:set {
+    [5005] = foo:proto('foo', 'Foo Protocol')
+  }
+}

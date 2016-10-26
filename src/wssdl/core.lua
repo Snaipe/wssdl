@@ -189,6 +189,49 @@ packetdef_metatable = {
 
 }
 
+local dissectdef_metatable = nil
+
+dissectdef_metatable = function(newdissect)
+  return {
+
+    __index = function(t, k)
+      local o = {
+        _path = { k };
+      }
+
+      -- Restore the original global metatable
+      debug.setfenv(wssdl.fenv, wssdl.env)
+      debug.reset_upvalues(wssdl.fenv, wssdl._upvalues)
+
+      setmetatable(o, {
+
+        __index = function(t, k)
+          t._path[#t._path + 1] = k
+          return t
+        end;
+
+        __call = function(t, _, params)
+          local method = t._path[#t._path]
+          t._path[#t._path] = nil
+          local tname = table.concat(t._path, '.')
+          local dt = DissectorTable.get(tname)
+          for k, v in pairs(params) do
+            dt[method](dt, k, v)
+          end
+          -- Switch to the dissect definition metatable
+          local env = setmetatable({}, dissectdef_metatable())
+          wssdl._upvalues = debug.get_upvalues(wssdl.fenv)
+          debug.setfenv(wssdl.fenv, env)
+          debug.reset_upvalues(wssdl.fenv)
+        end;
+
+      })
+      return o
+    end;
+
+  }
+end
+
 setmetatable(wssdl, {
 
   __index = function(t, k)
@@ -207,6 +250,26 @@ setmetatable(wssdl, {
       -- Switch to the packet definition metatable
       setmetatable(_G, packetdef_metatable)
       return newpacket
+    elseif k == 'dissect' then
+      local newdissect = {}
+
+      setmetatable(newdissect, {
+
+        __call = function(dissect, ...)
+          -- Restore the original global metatable
+          debug.setfenv(wssdl.fenv, wssdl.env)
+          return nil
+        end;
+
+      })
+
+      -- Switch to the dissect definition metatable
+      local env = setmetatable({}, dissectdef_metatable(newdissect))
+      debug.setfenv(wssdl.fenv, env)
+      newdissect._upvalues = debug.get_upvalues(wssdl.fenv)
+      debug.reset_upvalues(wssdl.fenv)
+
+      return newdissect
     end
   end;
 
@@ -215,6 +278,6 @@ setmetatable(wssdl, {
 wssdl.dissector = ws.dissector
 
 -- The user environment is 6 stack levels up
-wssdl.env = debug.getfenv(6)
+wssdl.env, wssdl.fenv = debug.getfenv(6)
 
 return wssdl

@@ -7,7 +7,7 @@
 -- This isn't an extensive replacement for the builtin TCP dissector, it
 -- simply shows that we can handle more complex packet definitions.
 --
-local wssdl = require("wssdl"):init(_ENV)
+local wssdl = require 'wssdl'
 
 tcp_flags = wssdl.packet
 {
@@ -50,6 +50,9 @@ tcp = wssdl.packet
   payload : payload { header.dst_port, 'tcp.port' };
 }
 
--- Let's replace the builtin dissector for TCP!
-DissectorTable.get('ip.proto')
-    :set(0x06, tcp:protocol('wssdl_TCP', 'Transmission Control Protocol (wssdl)'))
+wssdl.dissect {
+  -- Let's replace the builtin dissector for TCP!
+  ip.proto:set {
+    [0x06] = tcp:proto('wssdl_TCP', 'Transmission Control Protocol (wssdl)')
+  }
+}
