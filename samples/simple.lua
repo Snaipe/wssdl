@@ -8,7 +8,7 @@ foo = wssdl.packet
 }
 
 wssdl.dissect {
-  tcp.port:set {
+  udp.port:set {
     [5005] = foo:proto('foo', 'Foo Protocol')
   }
 }
