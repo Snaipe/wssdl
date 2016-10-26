@@ -50,9 +50,23 @@ tcp = wssdl.packet
   payload : payload { header.dst_port, 'tcp.port' };
 }
 
+-- Create a dummy protocol to subdissect with TCP
+
+foo = wssdl.packet
+  : desegment() -- Allow packet to be segmented (necessary for TCP)
+{
+  foo : u32();
+  bar : f64();
+  baz : utf8(4096);
+}
+
 wssdl.dissect {
   -- Let's replace the builtin dissector for TCP!
   ip.proto:set {
     [0x06] = tcp:proto('wssdl_TCP', 'Transmission Control Protocol (wssdl)')
-  }
+  };
+
+  tcp.port:add {
+    [5005] = foo:proto('foo', 'Foo Protocol')
+  };
 }
