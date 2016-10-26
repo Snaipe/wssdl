@@ -23,11 +23,7 @@ require('wssdl.bit') -- Monkey-patch 'bit' library
 local placeholder = require 'wssdl.placeholder' :init(wssdl)
 local utils       = require 'wssdl.utils'
 local ws          = require 'wssdl.wireshark'
-
-wssdl.init = function (self, env)
-  self.env = env
-  return self
-end
+local debug       = require 'wssdl.debug'
 
 local make_fields = nil
 
@@ -217,5 +213,8 @@ setmetatable(wssdl, {
 })
 
 wssdl.dissector = ws.dissector
+
+-- The user environment is 6 stack levels up
+wssdl.env = debug.getfenv(6)
 
 return wssdl

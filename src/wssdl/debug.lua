@@ -18,6 +18,8 @@
 
 local debug = {}
 
+local luadebug = require 'debug'
+
 debug.print = function(tbl, indent)
   if not indent then indent = 0 end
   if type(tbl) == 'table' then
@@ -34,6 +36,44 @@ debug.print = function(tbl, indent)
     end
   else
     print(string.rep("  ", indent) .. tostring(tbl))
+  end
+end
+
+debug.setfenv = setfenv or function (fn, env)
+  local i = 1
+  while true do
+    if type(fn) == 'number' then
+      fn = luadebug.getinfo(fn).func
+    end
+    local name = luadebug.getupvalue(fn, i)
+    if name == '_ENV' then
+      luadebug.upvaluejoin(fn, i, (function()
+        return env
+      end), 1)
+      break
+    elseif not name then
+      break
+    end
+
+    i = i + 1
+  end
+
+  return fn
+end
+
+debug.getfenv = getfenv or function (fn, env)
+  local i = 1
+  while true do
+    if type(fn) == 'number' then
+      fn = luadebug.getinfo(fn).func
+    end
+    local name, val = luadebug.getupvalue(fn, i)
+    if name == '_ENV' then
+      return val
+    elseif not name then
+      break
+    end
+    i = i + 1
   end
 end
 
