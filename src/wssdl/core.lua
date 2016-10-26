@@ -77,7 +77,7 @@ wssdl._packet = {
         return pkt
       end;
 
-      protocol = ws.proto
+      proto = ws.proto
 
     }
 
