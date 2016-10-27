@@ -2,7 +2,7 @@
 
 [![Build Status](https://api.travis-ci.org/diacritic/wssdl.svg?branch=master)](https://travis-ci.org/diacritic/wssdl/builds) 
 [![License (GPL)](https://img.shields.io/badge/license-GPLv3-blue.svg)](https://github.com/diacritic/wssdl/blob/master/LICENSE) 
-[![Version (Experimental)](https://img.shields.io/badge/version-experimental-orange.svg)](https://github.com/diacritic/wssdl/releases) 
+[![Version (Experimental)](https://img.shields.io/badge/version-v0.1.0-orange.svg)](https://github.com/diacritic/wssdl/releases) 
 [![Language (Lua)](https://img.shields.io/badge/powered_by-Lua-brightgreen.svg)](https://lua.org) 
 
 WireShark-Specific Dissector Language
