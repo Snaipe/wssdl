@@ -103,6 +103,35 @@ debug.traceback = function ()
   end
 end
 
+debug.find_local = function(lvl, n)
+  local i = 1
+
+  -- Search locals at specified stack level
+  while true do
+    local name, val = luadebug.getlocal(lvl, i)
+    if not name then
+      break
+    end
+    if name == n then
+      return val
+    end
+    i = i + 1
+  end
+
+  -- Search upvalues at specified stack level
+  i = 1
+  while true do
+    local name, val = luadebug.getupvalue(lvl, i)
+    if not name then
+      break
+    end
+    if name == n then
+      return val
+    end
+    i = i + 1
+  end
+  return nil
+end
 
 debug.get_locals = function(lvl)
   local locals = {}
