@@ -5,7 +5,7 @@
 [![Version (Experimental)](https://img.shields.io/badge/version-v0.1.0-orange.svg)](https://github.com/diacritic/wssdl/releases) 
 [![Language (Lua)](https://img.shields.io/badge/powered_by-Lua-brightgreen.svg)](https://lua.org) 
 
-WireShark-Specific Dissector Language
+Wireshark-Specific Dissector Language
 
 ```lua
 wssdl.packet {
@@ -30,7 +30,7 @@ Coming Soon! For the meantime, check out some of the [samples][samples].
 ### From the release
 
 Grab the bootstrapped `wssdl.lua` from the [latest release][latest],
-and put it in your WireShark Plugin directory
+and put it in your Wireshark Plugin directory
 (usually ~/.config/wireshark/plugins or /usr/lib/wireshark/<version>)
 
 ### From source
