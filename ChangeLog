@@ -1,3 +1,11 @@
+2016-10-31  Franklin "Snaipe" Mathieu  <snaipe@diacritic.io>
+
+    * wssdl: version 0.1.1
+    * Fix: Field names no longer conflict with eponymous local variables.
+    * Fix: wssdl.lua no longer produce an error when loaded alone.
+    * Fix: The environment of the first loaded file no longer gets used for
+      subsequent files.
+
 2016-10-27  Franklin "Snaipe" Mathieu  <snaipe@diacritic.io>
 
     * wssdl: version 0.1.0 (initial release)
