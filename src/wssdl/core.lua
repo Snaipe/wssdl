@@ -25,6 +25,11 @@ local utils       = require 'wssdl.utils'
 local ws          = require 'wssdl.wireshark'
 local debug       = require 'wssdl.debug'
 
+local initenv = function ()
+  -- The user environment is 4 stack levels up
+  wssdl.env, wssdl.fenv = debug.getfenv(4)
+end
+
 local make_fields = nil
 
 wssdl._packet = {
@@ -259,6 +264,7 @@ end
 setmetatable(wssdl, {
 
   __index = function(t, k)
+    initenv()
     if k == 'packet' then
       -- Create a new packet factory based off wssdl._packet
       local newpacket = {}
@@ -307,8 +313,5 @@ setmetatable(wssdl, {
 })
 
 wssdl.dissector = ws.dissector
-
--- The user environment is 6 stack levels up
-wssdl.env, wssdl.fenv = debug.getfenv(6)
 
 return wssdl
