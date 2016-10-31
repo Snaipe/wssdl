@@ -152,6 +152,7 @@ ws.dissector = function (pkt, proto)
       val = {},
       label = {}
     }
+    local subdissect = {}
 
     for i, field in ipairs(pkt._definition) do
 
@@ -162,7 +163,7 @@ ws.dissector = function (pkt, proto)
 
       if field._type == 'packet' then
         raw = buf(math.floor(idx / 8))
-        sz, dseg, val = dissect_pkt(field._packet, idx % 8, raw:tvb(), pinfo, root)
+        sz, dseg, val, sdiss = dissect_pkt(field._packet, idx % 8, raw:tvb(), pinfo, root)
         -- Handle errors
         if sz < 0 then
           return sz, dseg, val
@@ -171,6 +172,9 @@ ws.dissector = function (pkt, proto)
         raw = val.buf
         label = val.label
         val = val.val
+        for k, v in pairs(sdiss) do
+          subdissect[#subdissect + 1] = v
+        end
       else
         sz = #field
 
@@ -224,7 +228,7 @@ ws.dissector = function (pkt, proto)
           for i, v in pairs(field._dissection_criterion) do
             val = val[v]
           end
-          dt:try(val, raw:tvb(), pinfo, root)
+          subdissect[#subdissect + 1] = {dt = dt, tvb = raw:tvb(), val = val}
         elseif field._type == 'string' then
           local mname = 'string'
           if type(field._size) == 'number' and field._size == 0 then
@@ -307,7 +311,7 @@ ws.dissector = function (pkt, proto)
       idx = idx + sz
     end
 
-    return idx - start, 0, pktval
+    return idx - start, 0, pktval, subdissect
   end
 
   local dissect_proto = function (pkt, buf, pinfo, root)
@@ -316,13 +320,17 @@ ws.dissector = function (pkt, proto)
     -- Don't clone the packet definition further when evaluating
     pkt._properties.noclone = true
 
-    local len, desegment, val = dissect_pkt(pkt, 0, buf, pinfo, root)
+    local len, desegment, val, subdissect = dissect_pkt(pkt, 0, buf, pinfo, root)
     if len < 0 then
       return len, desegment
     end
 
     pinfo.cols.protocol = proto.name
     tree_add_fields(pkt, string.lower(proto.name) .. '.', root:add(proto, buf(), proto.description), val)
+
+    for k, v in pairs(subdissect) do
+      v.dt:try(v.val, v.tvb, pinfo, root)
+    end
 
     return math.ceil(len / 8), desegment
   end
