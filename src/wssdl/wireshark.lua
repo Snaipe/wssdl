@@ -299,6 +299,9 @@ ws.dissector = function (pkt, proto)
             if field._le then
               mname = 'le_' .. mname
             end
+            if sz > 32 and (field._type == 'signed' or field._type == 'unsigned') then
+              mname = mname .. '64'
+            end
             val = raw[mname](raw)
           end
         end
