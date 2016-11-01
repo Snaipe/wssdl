@@ -19,7 +19,7 @@ wssdl.packet {
   uint   : uint(4);   -- Unsigned 4-bit integer
 
   f32    : f32();     -- 32-bit floating-point value
-  f64    : f64();     -- 32-bit floating-point value
+  f64    : f64();     -- 64-bit floating-point value
 
   utf8   : utf8(20);  -- UTF8-encoded string w/ a length of 20 octets
   utf8z  : utf8z();   -- Null-terminated UTF8-encoded string
@@ -33,7 +33,7 @@ wssdl.packet {
   bit    : bit();     -- A single bit
 
   ipv4   : ipv4();    -- IPv4 address
-  ipv6   : ipv6();    -- IPv4 address
+  ipv6   : ipv6();    -- IPv6 address
 
   -- Using :le() on supported types means Little-Endian
   le_u32 : u32():le();
