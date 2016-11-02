@@ -23,7 +23,11 @@ purpose of expressing easily message dissectors.
 
 ## Documentation
 
-Coming Soon! For the meantime, check out some of the [samples][samples].
+| Stable | Latest |
+| --- | --- |
+[![Stable docs][doc-stable-badge]][doc-stable] | [![Latest docs][doc-latest-badge]][doc-latest]
+
+Also check out some of the [samples][samples].
 
 ## Install
 
@@ -44,3 +48,8 @@ to install it to `~/.config/wireshark/plugins`, or
 
 [latest]: https://github.com/diacritic/wssdl/releases/latest
 [samples]: https://github.com/diacritic/wssdl/tree/master/samples
+
+[doc-stable]:       http://wssdl.readthedocs.io/en/stable/?badge=stable
+[doc-latest]:       http://wssdl.readthedocs.io/en/latest/?badge=latest
+[doc-stable-badge]: https://readthedocs.org/projects/wssdl/badge/?version=stable
+[doc-latest-badge]: https://readthedocs.org/projects/wssdl/badge/?version=latest
