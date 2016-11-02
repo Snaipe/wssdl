@@ -239,7 +239,7 @@ ws.dissector = function (pkt, proto)
     end
   end
 
-  local function dissect_pkt(pkt, start, buf, pinfo, root)
+  local function dissect_pkt(pkt, start, buf, pinfo)
 
     local idx = start
     local pktval = {
@@ -249,7 +249,7 @@ ws.dissector = function (pkt, proto)
     }
     local subdissect = {}
 
-    local function size_of(field)
+    local function size_of(field, idx)
       local sz = #field
 
       if sz and type(sz) ~= 'number' then
@@ -269,20 +269,22 @@ ws.dissector = function (pkt, proto)
       return sz
     end
 
-    for i, field in ipairs(pkt._definition) do
-
+    local function dissect_field(field, idx)
       local sz = nil
       local raw = nil
       local val = nil
       local label = nil
+      local sdiss = nil
 
       if field._type == 'packet' then
         raw = buf(math.floor(idx / 8))
-        sz, dseg, val, sdiss = dissect_pkt(field._packet, idx % 8, raw:tvb(), pinfo, root)
+        local res, err = dissect_pkt(field._packet, idx % 8, raw:tvb(), pinfo)
         -- Handle errors
-        if sz < 0 then
-          return sz, dseg, val
+        if err then
+          return nil, err
         end
+
+        sz, val, sdiss = unpack(res, 1, 3)
         val.buf._self = buf(math.floor(idx / 8), math.ceil((sz + idx % 8) / 8))
         raw = val.buf
         label = val.label
@@ -291,29 +293,14 @@ ws.dissector = function (pkt, proto)
           subdissect[#subdissect + 1] = v
         end
       else
-        sz = size_of(field)
+        sz = size_of(field, idx)
 
         local offlen = math.ceil((sz + idx % 8) / 8)
         local needed = math.floor(idx / 8) + offlen
 
         raw = buf(0,0)
-        if sz > 0 then
-          if needed > buf:len() then
-            if pkt._properties.desegment then
-              local desegment = (needed - buf:len()) * 8
-              for j = i + 1, #pkt._definition do
-                local len = #pkt._definition[j]
-                if type(len) ~= 'number' then
-                  return -1, DESEGMENT_ONE_MORE_SEGMENT
-                end
-                desegment = desegment + len
-              end
-              return -1, math.ceil(desegment / 8)
-            else
-              root:add_proto_expert_info(proto.experts.too_short)
-              return -1, 0
-            end
-          end
+        if sz > 0 and needed > buf:len() then
+          return nil, {needed = needed}
         end
 
         if needed <= buf:len() and sz > 0 then
@@ -337,6 +324,34 @@ ws.dissector = function (pkt, proto)
         end
       end
 
+      return {raw, val, sz, label}
+    end
+
+    for i, field in ipairs(pkt._definition) do
+
+      local res, err = dissect_field(field, idx)
+      if err then
+        if err.needed > 0 then
+          if pkt._properties.desegment then
+            local desegment = (err.needed - buf:len()) * 8
+            for j = i + 1, #pkt._definition do
+              local len = #pkt._definition[j]
+              if type(len) ~= 'number' then
+                err.desegment = DESEGMENT_ONE_MORE_SEGMENT
+                return nil, err
+              end
+              desegment = desegment + len
+            end
+            err.desegment = math.ceil(desegment / 8)
+          else
+            err.expert = proto.experts.too_short
+          end
+        end
+        return nil, err
+      end
+
+      local raw, val, sz, label = unpack(res, 1, 4)
+
       pktval.buf[field._name] = raw
       pktval.val[field._name] = val
       pktval.label[field._name] = label
@@ -344,7 +359,7 @@ ws.dissector = function (pkt, proto)
       idx = idx + sz
     end
 
-    return idx - start, 0, pktval, subdissect
+    return {idx - start, pktval, subdissect}
   end
 
   local function dissect_proto(pkt, buf, pinfo, root)
@@ -353,13 +368,23 @@ ws.dissector = function (pkt, proto)
     -- Don't clone the packet definition further when evaluating
     pkt._properties.noclone = true
 
-    local len, desegment, val, subdissect = dissect_pkt(pkt, 0, buf, pinfo, root)
-    if len < 0 then
+    local res, err = dissect_pkt(pkt, 0, buf, pinfo, root)
+    if err and err.desegment then
       return len, desegment
     end
 
     pinfo.cols.protocol = proto.name
-    tree_add_fields(pkt, string.lower(proto.name) .. '.', root:add(proto, buf(), proto.description), val)
+    local tree = root:add(proto, buf(), proto.description)
+
+    if err then
+      if err.expert then
+        tree:add_proto_expert_info(err.expert)
+      end
+      return -1, 0
+    end
+
+    local len, val, subdissect = unpack(res, 1, 3)
+    tree_add_fields(pkt, string.lower(proto.name) .. '.', tree, val)
 
     for k, v in pairs(subdissect) do
       v.dt:try(v.val, v.tvb, pinfo, root)
