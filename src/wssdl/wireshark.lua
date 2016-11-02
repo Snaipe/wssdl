@@ -368,7 +368,7 @@ ws.dissector = function (pkt, proto)
     -- Don't clone the packet definition further when evaluating
     pkt._properties.noclone = true
 
-    local res, err = dissect_pkt(pkt, 0, buf, pinfo, root)
+    local res, err = dissect_pkt(pkt, 0, buf, pinfo)
     if err and err.desegment then
       return len, desegment
     end
