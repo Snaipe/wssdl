@@ -387,7 +387,9 @@ ws.dissector = function (pkt, proto)
     tree_add_fields(pkt, string.lower(proto.name) .. '.', tree, val)
 
     for k, v in pairs(subdissect) do
-      v.dt:try(v.val, v.tvb, pinfo, root)
+      if v.tvb:len() > 0 then
+        v.dt:try(v.val, v.tvb, pinfo, root)
+      end
     end
 
     return math.ceil(len / 8), desegment
