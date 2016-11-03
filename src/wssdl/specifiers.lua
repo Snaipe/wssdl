@@ -167,7 +167,7 @@ specifiers.field_types = {
       -- Check if the criterion refers to a real field
       local path = criterion[1]
       local f = field._pktdef[criterion[1]]
-      if f then
+      if f and #criterion > 1 then
         f = f._packet
       end
       for i = 2, #criterion do
