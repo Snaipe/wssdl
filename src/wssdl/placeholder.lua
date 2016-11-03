@@ -72,25 +72,27 @@ local new_funcall_placeholder = function(func, ...)
   return ph
 end
 
-local new_field_placeholder = function(id)
+local new_field_placeholder = function(id, field)
   local ph = new_placeholder (function(self, values)
       local val = values[self._id]
       if val ~= nil then
         return val
       else
-        return new_field_placeholder(self._id)
+        return new_field_placeholder(self._id, self._field)
       end
     end)
   ph._id = id
+  ph._field = field
   return ph
 end
 
-local new_subscript_placeholder = function(parent, subscript)
+local new_subscript_placeholder = function(parent, subscript, field)
   local ph = new_placeholder (function(self, values)
       return do_eval(self._parent, values)[self._id]
     end)
   ph._parent = parent
   ph._id = subscript
+  ph._field = field
   return ph
 end
 
@@ -178,7 +180,21 @@ placeholder_metatable = {
     if string.sub(k, 1, 1) == '_' then
       return nil
     end
-    return new_subscript_placeholder(t, k)
+
+    if t._field._type ~= 'packet' then
+      error('wssdl: Symbol ' .. utils.quote(t._id) .. ' is not subscriptable.', 2)
+    end
+
+    local fidx = t._field._packet._lookup[k]
+    if not fidx then
+      local path, e = '', t
+      while t do
+        path = t._id .. '.' .. path
+        t = t._parent
+      end
+      error('wssdl: Symbol ' .. utils.quote(path:sub(1, #path - 1)) .. ' has no member named ' .. utils.quote(k) .. '.', 2)
+    end
+    return new_subscript_placeholder(t, k, t._field._packet._definition[fidx])
   end;
 
   __unm = function(val)
@@ -321,14 +337,14 @@ placeholder.metatable = function(defenv, packetdef_metatable, make_pktfield)
           if pktdef[k] == nil then
             error('wssdl: Unknown symbol ' .. utils.quote(k) .. '.', 2)
           end
-          return new_field_placeholder(k)
+          return new_field_placeholder(k, pktdef[k])
         end;
       })
 
       -- Inside a field definition, we switch to the resolver context
       debug.setfenv(wssdl.fenv, env)
       -- The user environment is 3 stack levels up
-      debug.reset_locals(3, nil, function(ctx, n) return new_field_placeholder(n) end)
+      debug.reset_locals(3, nil, function(ctx, n) return new_field_placeholder(n, pktdef[n]) end)
       debug.set_locals(3, wssdl._locals)
 
       return fieldtype

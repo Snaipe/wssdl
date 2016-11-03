@@ -18,6 +18,8 @@
 
 local specifiers = {}
 
+local utils = require 'wssdl.utils'
+
 local type_specifier = function (type, basesz)
   local o = {
     _imbue = function (field, s)
@@ -157,6 +159,36 @@ specifiers.field_types = {
         end
         field._dt_name = dt_name
       end
+
+      if #criterion == 0 then
+        error('wssdl: Field ' .. utils.quote(field._name) .. ' needs a dissection criterion.', 2)
+      end
+
+      -- Check if the criterion refers to a real field
+      local path = criterion[1]
+      local f = field._pktdef[criterion[1]]
+      if f then
+        f = f._packet
+      end
+      for i = 2, #criterion do
+        local v = criterion[i]
+        if f then
+          local idx = f._lookup[v]
+          if idx then
+            if i < #criterion then
+              f = rawget(f._definition[idx], '_packet')
+            end
+          else
+            f = nil
+          end
+        end
+        path = path .. '.' .. v
+      end
+
+      if not f then
+        error('wssdl: Dissection criterion ' .. utils.quote(path) .. ' does not match a real field.', 2)
+      end
+
       field._dissection_criterion = criterion
       field._size = size
       field._type = "payload"

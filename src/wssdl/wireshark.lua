@@ -316,6 +316,10 @@ ws.dissector = function (pkt, proto)
           local val = pktval.val
           for i, v in pairs(field._dissection_criterion) do
             val = val[v]
+            if not val then
+              error('wssdl: Dissection criterion for ' .. utils.quote(field._name) ..
+                    ' does not match a real field.')
+            end
           end
           subdissect[#subdissect + 1] = {dt = dt, tvb = raw:tvb(), val = val}
         else
