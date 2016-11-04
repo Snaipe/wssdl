@@ -135,7 +135,16 @@ local dissect_int_base = function(char, mname)
       local packed = Struct.pack('>I' .. tostring(math.ceil(sz / 8)), raw:bitfield(idx % 8, sz))
       return raw, Struct.unpack(fmt, packed), sz
     else
-      return raw, raw[(field._le and 'le_' or '') .. mname .. (sz > 32 and '64' or '')](raw), sz
+      local val
+      -- Versions of wireshark prior to 2.3.0 did not implement :int() for 3-byte integers.
+      -- We have to manually extract them as 2 then 1 bytes integers.
+      if mname == 'int' and sz == 24 and utils.semver(get_version()) < utils.semver('2.3.0') then
+        local lo, hi = raw(1,2):uint(), raw(0,1):uint()
+        val = Struct.unpack((field._le and '<' or '>') .. 'I3', Struct.pack('>I1I2', hi, lo))
+      else
+        val = raw[(field._le and 'le_' or '') .. mname .. (sz > 32 and '64' or '')](raw)
+      end
+      return raw, val, sz
     end
   end
 end
