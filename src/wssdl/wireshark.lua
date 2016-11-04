@@ -122,7 +122,7 @@ ws.make_fields = function (fields, pkt, prefix)
   end
 end
 
-local dissect_int_base = function(char, mname)
+local dissect_int_base = function(char, c64, mname)
   return function (field, buf, raw, idx, sz)
     if idx % 8 > 0 then
       if sz > 64 then
@@ -130,9 +130,16 @@ local dissect_int_base = function(char, mname)
         ' is larger than 64 bits, which is not supported by wireshark.')
       end
 
-      local fmt = (field._le and '<' or '>') .. char .. tostring(math.ceil(sz / 8))
+      local fmt, fmtp
+      if math.ceil(sz / 8) > 4 then
+        fmt = (field._le and '<' or '>') .. c64
+        fmtp = '>E'
+      else
+        fmt = (field._le and '<' or '>') .. char .. tostring(math.ceil(sz / 8))
+        fmtp = '>I' .. tostring(math.ceil(sz / 8))
+      end
 
-      local packed = Struct.pack('>I' .. tostring(math.ceil(sz / 8)), raw:bitfield(idx % 8, sz))
+      local packed = Struct.pack(fmtp, raw:bitfield(idx % 8, sz))
       return raw, Struct.unpack(fmt, packed), sz
     else
       local val
@@ -201,9 +208,9 @@ local dissect_type = {
     return raw, tostring(raw:bytes()), sz
   end;
 
-  signed = dissect_int_base('i', 'int');
+  signed = dissect_int_base('i', 'e', 'int');
 
-  unsigned = dissect_int_base('I', 'uint');
+  unsigned = dissect_int_base('I', 'E', 'uint');
 
   float = function (field, buf, raw, idx, sz)
     if idx % 8 > 0 then
@@ -212,8 +219,8 @@ local dissect_type = {
               ' is larger than 64 bits, which is not supported by wireshark.')
       end
 
-      local fmt = (field._le and '<' or '>') .. 'f'
-      local packed = Struct.pack('>I' .. tostring(math.ceil(sz / 8)), raw:bitfield(idx % 8, sz))
+      local fmt = (field._le and '<' or '>') .. (sz == 64 and 'd' or 'f')
+      local packed = Struct.pack(sz == 64 and '>E' or '>I4', raw:bitfield(idx % 8, sz))
       return raw, Struct.unpack(fmt, packed), sz
     else
       local val = field._le and raw:le_float() or raw:float()
