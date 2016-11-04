@@ -207,7 +207,7 @@ local dissect_type = {
       local packed = Struct.pack('>I' .. tostring(math.ceil(sz / 8)), raw:bitfield(idx % 8, sz))
       return raw, Struct.unpack(fmt, packed), sz
     else
-      local val = field._le and raw:float() or raw:le_float()
+      local val = field._le and raw:le_float() or raw:float()
       return raw, val, sz
     end
   end;
