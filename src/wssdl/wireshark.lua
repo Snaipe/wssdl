@@ -93,7 +93,7 @@ ws.make_fields = function (fields, pkt, prefix)
         if type(len) ~= 'number' then
           error('wssdl: Cannot compute size of primitive ' .. utils.quote(field._name) .. ' field.')
         end
-        tname = tname .. tostring(len)
+        tname = tname .. tostring(len > 32 and 64 or math.ceil(len / 8) * 8)
       end
 
       ftype = ftypes[tname]
