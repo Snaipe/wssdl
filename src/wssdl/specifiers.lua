@@ -186,7 +186,15 @@ specifiers.field_types = {
       end
 
       if not f then
-        error('wssdl: Dissection criterion ' .. utils.quote(path) .. ' does not match a real field.', 2)
+        error('wssdl: Dissection criterion ' .. utils.quote(path) ..
+              ' does not match a real field.', 2)
+      end
+
+      -- Check if the type is valid
+      local validt = { unsigned = true, bits = true, string = true }
+      if not validt[f._type] then
+        error('wssdl: Dissection criterion ' .. utils.quote(path) ..
+              ' must be an unsigned integer or a string.', 2)
       end
 
       field._dissection_criterion = criterion
