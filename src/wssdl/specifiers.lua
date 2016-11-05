@@ -23,7 +23,11 @@ local utils = require 'wssdl.utils'
 local type_specifier = function (type, basesz)
   local o = {
     _imbue = function (field, s)
-      field._size = s * basesz
+      if s then
+        field._size = s * basesz
+      else
+        field._size = nil
+      end
       field._type = type
       return field
     end
