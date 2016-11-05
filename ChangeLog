@@ -1,3 +1,19 @@
+2016-11-05  Franklin "Snaipe" Mathieu  <snaipe@diacritic.io>
+
+    * wssdl: version 0.2
+    * Add: Fields can now exist after a field of unspecified size
+    * Add: The first parameter of `:payload` is now validated
+    * Fix: Aligned integers larger than 32-bits are working again
+    * Fix: Subdissectors are no longer called on empty Tvbs (caused crashes)
+    * Fix: Specifier chaining is working again
+    * Fix: The endianness of float fields is no longer swapped
+    * Fix: 24-bit signed integers are working again
+    * Fix: Integers with a bit size not divisible by 8 are working again
+    * Fix: Unaligned number fields are no longer broken
+    * Fix: The parsing of bytes() no longer interprets the hexadecimal string as
+      raw data
+    * Fix: Fixed specifiers without size not taking the whole buffer
+
 2016-10-31  Franklin "Snaipe" Mathieu  <snaipe@diacritic.io>
 
     * wssdl: version 0.1.1

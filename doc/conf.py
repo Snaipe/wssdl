@@ -41,7 +41,7 @@ copyright = u'2016, Franklin "Snaipe" Mathieu'
 # built documents.
 #
 # The full version, including alpha/beta/rc tags.
-release = '0.1.1'
+release = '0.2.0'
 # The short X.Y version.
 version = re.search(r'\d+\.\d+', release).group(0)
 
