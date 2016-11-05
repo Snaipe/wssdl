@@ -94,18 +94,17 @@ wstest.case = function (pkt)
     dissector = ws.dissector(pkt, proto)
   }
 
-  local function make_fields(pkt)
+  local function make_fields(prefix, pkt)
     for k, v in pairs(pkt._definition) do
+      local fname = prefix .. v._name
       if v._type == 'packet' then
-        make_fields(v._packet)
-      else
-        local fname = protoname .. '.' .. v._name
-        case.fields[fname] = Field.new(fname)
+        make_fields(fname .. '.', v._packet)
       end
+      case.fields[fname] = Field.new(fname)
     end
   end
 
-  make_fields(pkt)
+  make_fields(protoname .. '.', pkt)
 
   return case
 end
