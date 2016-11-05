@@ -8,3 +8,4 @@ wssdl
     setup
     starter
     specifiers
+    parsing
