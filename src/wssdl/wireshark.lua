@@ -172,7 +172,7 @@ local dissect_type = {
     local mname = 'string'
     if not field._size or field._size == 0 then
       if reverse then
-        error('wssdl: Null-terminated strings cannot logically be used as footer fields.')
+        error('wssdl: Null-terminated strings cannot logically be used as suffix fields.')
       end
       raw = buf(math.floor(idx / 8))
       mname = mname .. 'z'
@@ -346,7 +346,7 @@ ws.dissector = function (pkt, proto)
 
         if sz == nil then
           if reverse then
-            error('wssdl: Cannot evaluate the size of the footer field ' .. utils.quote(field._name))
+            error('wssdl: Cannot evaluate the size of the suffix field ' .. utils.quote(field._name))
           elseif #pkt._definition ~= ifield then
             local res, err = dissect_pkt(pkt, buf:len() * 8, buf,
                 pinfo, #pkt._definition, ifield + 1, true)
