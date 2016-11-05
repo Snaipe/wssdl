@@ -225,6 +225,34 @@ specifiers.field_types = {
       return field
     end
   };
+
+  accept = {
+    _imbue = function(field, ...)
+      field._accept = field._accept or {}
+      for _, p in ipairs({...}) do
+        if type(p) == 'function' then
+          field._accept[#field._accept + 1] = p
+        else
+          field._accept[#field._accept + 1] = function(e) return type(e) == type(p) and p == e end
+        end
+      end
+      return field
+    end
+  };
+
+  reject = {
+    _imbue = function(field, ...)
+      field._reject = field._reject or {}
+      for _, p in ipairs({...}) do
+        if type(p) == 'function' then
+          field._reject[#field._reject + 1] = function(e) return not p(e) end
+        else
+          field._reject[#field._reject + 1] = function(e) return type(e) ~= type(p) or p ~= e end
+        end
+      end
+      return field
+    end
+  };
 }
 
 return specifiers

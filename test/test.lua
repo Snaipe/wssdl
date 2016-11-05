@@ -30,7 +30,7 @@ wstest.proto = function (pkt)
 end
 
 local test_idx = 1
-wstest.case = function (pkt)
+wstest.case = function (props, pkt)
   local i = test_idx
   test_idx = test_idx + 1
 
@@ -44,7 +44,7 @@ wstest.case = function (pkt)
       local res = self.dissector(tvb, wstest._pinfo, wstest._root)
 
       if res == 0 then
-        return false, 'The payload did not match the dissector'
+        return props.rejected or false, 'The payload did not match the dissector'
       end
 
       if res and res ~= actual:len() then
@@ -129,7 +129,7 @@ wstest.autosuite = function (name)
   return function(tests)
     local funcs = {}
     for k, v in pairs(tests) do
-      v.pkt = wstest.case(v.pkt)
+      v.pkt = wstest.case(v, v.pkt)
       if type(v.actual) == 'string' then
         v.actual = ByteArray.new(v.actual)
       elseif type(v.actual) == 'table' then

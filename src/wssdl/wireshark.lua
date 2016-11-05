@@ -422,6 +422,27 @@ ws.dissector = function (pkt, proto)
 
         local raw, val, len, label = unpack(res, 1, 4)
 
+        if field._accept or field._reject then
+          local ok = false
+          for k, v in pairs(field._accept or {}) do
+            if v(val) then
+              ok = true
+              break
+            end
+          end
+          if ok then
+            for k, v in pairs(field._reject or {}) do
+              if not v(val) then
+                ok = false
+                break
+              end
+            end
+          end
+          if not ok then
+            return nil, {reject = true}
+          end
+        end
+
         pktval.sz[field._name] = len
         pktval.buf[field._name] = raw
         pktval.val[field._name] = val
@@ -451,6 +472,9 @@ ws.dissector = function (pkt, proto)
     if err then
       if err.expert then
         tree:add_proto_expert_info(err.expert)
+      end
+      if err.reject then
+        return 0
       end
       return -1, 0
     end
