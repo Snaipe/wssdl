@@ -297,8 +297,9 @@ ws.dissector = function (pkt, proto)
 
         local istart = reverse and #field._packet._definition or 1
         local iend   = reverse and 1 or #field._packet._definition
+        local start  = reverse and raw:len() * 8 - idx % 8 or idx % 8
 
-        local res, err = dissect_pkt(field._packet, idx % 8, raw:tvb(), pinfo, istart, iend, reverse)
+        local res, err = dissect_pkt(field._packet, start, raw:tvb(), pinfo, istart, iend, reverse)
         -- Handle errors
         if err then
           return nil, err

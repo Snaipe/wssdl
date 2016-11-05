@@ -18,6 +18,10 @@
 
 local wssdl = require 'wssdl'
 
+local dummy = wssdl.packet {
+  dummy : u32()
+}
+
 wstest.autosuite 'suffix' {
 
   basic = {
@@ -34,6 +38,22 @@ wstest.autosuite 'suffix' {
       suffix  = 3149642683
     }
 
-  }
+  };
+
+  nested = {
+
+    pkt = wssdl.packet {
+      payload : bytes();
+      suffix : dummy();
+    };
+
+    actual = 'aaaaaaaaaaaaaaaa' .. wstest.pack('>I4', 3149642683);
+
+    expected = {
+      payload = ByteArray.new('aaaaaaaaaaaaaaaa'),
+      ['suffix.dummy'] = 3149642683
+    }
+
+  };
 
 }
