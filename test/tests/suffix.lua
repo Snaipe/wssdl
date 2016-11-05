@@ -56,4 +56,24 @@ wstest.autosuite 'suffix' {
 
   };
 
+  basic_unaligned = {
+
+    pkt = wssdl.packet {
+      payload : bytes();
+      bit : bit();
+      suffix : u32();
+      align : bits(7);
+    };
+
+    actual = 'aaaaaaaaaaaaaaaa5555555500';
+
+    expected = {
+      payload = ByteArray.new('aaaaaaaaaaaaaaaa'),
+      bit = 0,
+      suffix  = 2863311530,
+      align = 0
+    }
+
+  };
+
 }

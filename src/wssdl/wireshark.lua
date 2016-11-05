@@ -158,12 +158,14 @@ end
 
 local dissect_type = {
 
-  bits = function (field, buf, raw, idx, sz)
+  bits = function (field, buf, raw, idx, sz, reverse)
     if sz > 64 then
       error('wssdl: "' .. field._type .. '" field ' .. field._name ..
             ' is larger than 64 bits, which is not supported by wireshark.')
     end
-    return raw, raw:bitfield(idx % 8, sz), sz
+
+    local start = reverse and idx - sz or idx
+    return raw, raw:bitfield(start % 8, sz), sz
   end;
 
   string = function (field, buf, raw, idx, sz, reverse)
