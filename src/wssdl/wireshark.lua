@@ -205,7 +205,7 @@ local dissect_type = {
       error('wssdl: field ' .. utils.quote(field._name) ..
             ' is an unaligned "bytes" field, which is not supported.')
     end
-    return raw, tostring(raw:bytes()), sz
+    return raw, Struct.fromhex(tostring(raw:bytes())), sz
   end;
 
   signed = dissect_int_base('i', 'e', 'int');
