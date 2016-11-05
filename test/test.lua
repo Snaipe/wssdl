@@ -48,7 +48,7 @@ wstest.case = function (props, pkt)
       end
 
       if res and res ~= actual:len() then
-        return false, 'The dissector processed ' .. res .. ' bytes different while the buffer length is ' .. actual:len() .. ' bytes.'
+        return false, 'The dissector processed ' .. res .. ' bytes while the buffer length is ' .. actual:len() .. ' bytes.'
       end
 
       if wstest._pinfo.desegment_offset > 0 or wstest._pinfo.desegment_len > 0 then
@@ -219,16 +219,16 @@ runner.dissector = function (tvb, pinfo, root)
 
   wstest._pinfo = pinfo
 
-  for name, suite in pairs(suites) do
+  for sname, suite in pairs(suites) do
     local nbtests = 0
     for _,_ in pairs(suite) do
       nbtests = nbtests + 1
     end
     if nbtests > 0 then
-      log.info('[' .. ansi.cyan .. '⚙' .. ansi.reset ..'] ' .. name .. ': running ' .. nbtests .. ' tests')
+      log.info('[' .. ansi.cyan .. '⚙' .. ansi.reset ..'] ' .. sname .. ': running ' .. nbtests .. ' tests')
 
       for name, test in pairs(suite) do
-        log.info('[' .. ansi.cyan .. '⚙' .. ansi.reset ..'] ' .. name .. ': started')
+        log.info('[' .. ansi.cyan .. '⚙' .. ansi.reset ..'] ' .. sname .. '.' .. name .. ': started')
 
         tree = root:add(runner)
         tree:set_hidden()
@@ -248,7 +248,7 @@ runner.dissector = function (tvb, pinfo, root)
         end
 
         log.print(level, '[' .. color .. prefix .. ansi.reset ..'] %s: %s',
-            name, ok and 'OK' or 'KO')
+            sname .. '.' .. name, ok and 'OK' or 'KO')
 
         if not ok then
           local pref = '[' .. ansi.grey .. '-' .. ansi.reset ..'] '
