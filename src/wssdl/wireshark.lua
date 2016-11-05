@@ -166,9 +166,12 @@ local dissect_type = {
     return raw, raw:bitfield(idx % 8, sz), sz
   end;
 
-  string = function (field, buf, raw, idx, sz)
+  string = function (field, buf, raw, idx, sz, reverse)
     local mname = 'string'
     if not field._size or field._size == 0 then
+      if reverse then
+        error('wssdl: Null-terminated strings cannot logically be used as footer fields.')
+      end
       raw = buf(math.floor(idx / 8))
       mname = mname .. 'z'
     end
@@ -255,17 +258,17 @@ ws.dissector = function (pkt, proto)
     end
   end
 
-  local function dissect_pkt(pkt, start, buf, pinfo)
-
+  local function dissect_pkt(pkt, start, buf, pinfo, istart, iend, reverse)
     local idx = start
     local pktval = {
+      sz = {},
       buf = {},
       val = {},
       label = {}
     }
     local subdissect = {}
 
-    local function size_of(field, idx)
+    local function size_of(field)
       local sz = #field
 
       if sz and type(sz) ~= 'number' then
@@ -278,14 +281,10 @@ ws.dissector = function (pkt, proto)
               ' field.')
       end
 
-      if sz == nil then
-        sz = buf:len() * 8 - idx
-      end
-
       return sz
     end
 
-    local function dissect_field(field, idx)
+    local function dissect_field(ifield, field, idx)
       local sz = nil
       local raw = nil
       local val = nil
@@ -293,15 +292,25 @@ ws.dissector = function (pkt, proto)
       local sdiss = nil
 
       if field._type == 'packet' then
-        raw = buf(math.floor(idx / 8))
-        local res, err = dissect_pkt(field._packet, idx % 8, raw:tvb(), pinfo)
+        raw = reverse and buf(0, math.ceil(idx / 8))
+                      or buf(math.floor(idx / 8))
+
+        local istart = reverse and #field._packet._definition or 1
+        local iend   = reverse and 1 or #field._packet._definition
+
+        local res, err = dissect_pkt(field._packet, idx % 8, raw:tvb(), pinfo, istart, iend, reverse)
         -- Handle errors
         if err then
           return nil, err
         end
 
         sz, val, sdiss = unpack(res, 1, 3)
-        val.buf._self = buf(math.floor(idx / 8), math.ceil((sz + idx % 8) / 8))
+        if reverse then
+          sz = -sz
+        end
+        local procsz = math.ceil((sz + idx % 8) / 8)
+        val.buf._self = reverse and buf(math.floor(idx / 8) - procsz, procsz)
+                                or buf(math.floor(idx / 8), procsz)
         raw = val.buf
         label = val.label
         val = val.val
@@ -309,13 +318,46 @@ ws.dissector = function (pkt, proto)
           subdissect[#subdissect + 1] = v
         end
       else
-        sz = size_of(field, idx)
+        sz = size_of(field)
+
+        if sz == nil then
+          if reverse then
+            error('wssdl: Cannot evaluate the size of the footer field ' .. utils.quote(field._name))
+          elseif #pkt._definition ~= ifield then
+            local res, err = dissect_pkt(pkt, buf:len(), buf,
+                pinfo, #pkt._definition, ifield + 1, true)
+
+            -- Handle errors
+            if err then
+              return nil, err
+            end
+
+            local len, val, sdiss = unpack(res, 1, 3)
+            len = -len
+
+            for k, v in pairs(sdiss) do
+              subdissect[#subdissect + 1] = v
+            end
+            for k, v in pairs(val.sz) do pktval.sz[k] = v end
+            for k, v in pairs(val.val) do pktval.val[k] = v end
+            for k, v in pairs(val.buf) do pktval.buf[k] = v end
+            for k, v in pairs(val.label) do pktval.label[k] = v end
+
+            sz = (buf:len() * 8 - len) - idx
+          else
+            sz = buf:len() * 8 - idx
+          end
+        end
 
         local offlen = math.ceil((sz + idx % 8) / 8)
-        local needed = math.floor(idx / 8) + offlen
+        local needed = reverse and math.ceil(idx / 8) - offlen
+                               or  math.floor(idx / 8) + offlen
 
         raw = buf(0,0)
-        if sz > 0 and needed > buf:len() then
+        if sz > 0 and needed > buf:len() or needed < 0 then
+          if needed < 0 then
+            needed = buf:len() - needed
+          end
           return nil, {needed = needed}
         end
 
@@ -340,43 +382,50 @@ ws.dissector = function (pkt, proto)
           subdissect[#subdissect + 1] = {dt = dt, tvb = raw:tvb(), val = val}
         else
           local df = dissect_type[field._type] or dissect_type.default
-          raw, val, sz, label = df(field, buf, raw, idx, sz)
+          raw, val, sz, label = df(field, buf, raw, idx, sz, reverse)
         end
       end
 
       return {raw, val, sz, label}
     end
 
-    for i, field in ipairs(pkt._definition) do
+    local istep  = reverse and -1 or 1
 
-      local res, err = dissect_field(field, idx)
-      if err then
-        if err.needed > 0 then
-          if pkt._properties.desegment then
-            local desegment = (err.needed - buf:len()) * 8
-            for j = i + 1, #pkt._definition do
-              local len = #pkt._definition[j]
-              if type(len) ~= 'number' then
-                err.desegment = DESEGMENT_ONE_MORE_SEGMENT
-                return nil, err
+    for i = istart, iend, istep do
+      local field = pkt._definition[i]
+
+      if pktval.val[field._name] == nil then
+
+        local res, err = dissect_field(i, field, idx)
+        if err then
+          if err.needed > 0 then
+            if pkt._properties.desegment then
+              local desegment = (err.needed - buf:len()) * 8
+              for j = i + 1, #pkt._definition do
+                local len = #pkt._definition[j]
+                if type(len) ~= 'number' then
+                  err.desegment = DESEGMENT_ONE_MORE_SEGMENT
+                  return nil, err
+                end
+                desegment = desegment + len
               end
-              desegment = desegment + len
+              err.desegment = math.ceil(desegment / 8)
+            else
+              err.expert = proto.experts.too_short
             end
-            err.desegment = math.ceil(desegment / 8)
-          else
-            err.expert = proto.experts.too_short
           end
+          return nil, err
         end
-        return nil, err
+
+        local raw, val, len, label = unpack(res, 1, 4)
+
+        pktval.sz[field._name] = len
+        pktval.buf[field._name] = raw
+        pktval.val[field._name] = val
+        pktval.label[field._name] = label
+
       end
-
-      local raw, val, sz, label = unpack(res, 1, 4)
-
-      pktval.buf[field._name] = raw
-      pktval.val[field._name] = val
-      pktval.label[field._name] = label
-
-      idx = idx + sz
+      idx = reverse and idx - pktval.sz[field._name] or idx + pktval.sz[field._name]
     end
 
     return {idx - start, pktval, subdissect}
@@ -388,7 +437,7 @@ ws.dissector = function (pkt, proto)
     -- Don't clone the packet definition further when evaluating
     pkt._properties.noclone = true
 
-    local res, err = dissect_pkt(pkt, 0, buf, pinfo)
+    local res, err = dissect_pkt(pkt, 0, buf, pinfo, 1, #pkt._definition, false)
     if err and err.desegment then
       return len, desegment
     end
@@ -446,7 +495,12 @@ ws.dissector = function (pkt, proto)
 end
 
 ws.proto = function (pkt, name, description)
-  local proto = Proto.new(name, description)
+  local ok, res = pcall(Proto.new, name, description)
+  -- Propagate error with the correct stack level
+  if not ok then
+    error(res, 2)
+  end
+  local proto = res
   ws.make_fields(proto.fields, pkt, string.lower(name) .. '.')
 
   proto.experts.too_short = ProtoExpert.new(
