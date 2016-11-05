@@ -233,6 +233,13 @@ specifiers.field_types = {
     end
   };
 
+  value = {
+    _imbue = function(field, val)
+      field._value = val
+      return field
+    end
+  };
+
   accept = {
     _imbue = function(field, ...)
       field._accept = field._accept or {}

@@ -302,7 +302,70 @@ ws.dissector = function (pkt, proto)
       return align or 1
     end
 
-    local function dissect_field(ifield, field, idx)
+    local function value_of(field)
+      local value = field._value
+
+      if value and type(value) == 'table' and rawget(value, '_eval') then
+        pkt:eval(pktval.val)
+        value = field._value
+      end
+
+      if value and type(value) == 'table' and rawget(value, '_eval') then
+        error('wssdl: Cannot evaluate field ' .. utils.quote(field._name) .. '.')
+      end
+
+      return value
+    end
+
+    local dissect_field
+
+    local function find_valued_field_after(ifield)
+      local start = buf:len() * 8
+      local iend = #pkt._definition
+      for i = ifield + 1, #pkt._definition do
+        local field = pkt._definition[i]
+        local value = value_of(field)
+        if value then
+          local align = align_of(field)
+          local sz = size_of(field)
+          local idx = idx
+
+          if idx % align ~= 0 then
+            idx = idx + (align - idx % align)
+          end
+
+          -- Find the value in the tvb
+          local found = false
+          while idx + sz <= buf:len() * 8 do
+            local res, err = dissect_field(i, field, idx)
+            if err then
+              return nil, err
+            end
+            local raw, val, _, label = unpack(res, 1, 4)
+
+            pktval.sz[field._name] = sz
+            pktval.buf[field._name] = raw
+            pktval.val[field._name] = val
+            pktval.label[field._name] = label
+
+            if val == value then
+              found = true
+              break
+            end
+            idx = idx + align
+          end
+          if not found then
+            error('wssdl: Valued field ' .. utils.quote(field._name) .. ' could not be found in the payload')
+          end
+          start = idx
+          iend = i - 1
+          break
+        end
+      end
+      return start, iend
+    end
+
+    dissect_field = function (ifield, field, idx)
       local sz = nil
       local raw = nil
       local val = nil
@@ -348,8 +411,10 @@ ws.dissector = function (pkt, proto)
           if reverse then
             error('wssdl: Cannot evaluate the size of the suffix field ' .. utils.quote(field._name))
           elseif #pkt._definition ~= ifield then
-            local res, err = dissect_pkt(pkt, buf:len() * 8, buf,
-                pinfo, #pkt._definition, ifield + 1, true)
+            -- Get to the end or the next value field
+            local start, iend = find_valued_field_after(ifield)
+            local res, err = dissect_pkt(pkt, start, buf,
+                pinfo, iend, ifield + 1, true)
 
             -- Handle errors
             if err then
@@ -367,7 +432,7 @@ ws.dissector = function (pkt, proto)
             for k, v in pairs(val.buf) do pktval.buf[k] = v end
             for k, v in pairs(val.label) do pktval.label[k] = v end
 
-            sz = (buf:len() * 8 - len) - idx
+            sz = (start - len) - idx
           else
             sz = buf:len() * 8 - idx
           end
