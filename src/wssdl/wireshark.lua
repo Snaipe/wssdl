@@ -286,12 +286,33 @@ ws.dissector = function (pkt, proto)
       return sz
     end
 
+    local function align_of(field)
+      local align = field._align
+
+      if align and type(align) ~= 'number' then
+        pkt:eval(pktval.val)
+        align = field._align
+      end
+
+      if align and type(align) ~= 'number' then
+        error('wssdl: Cannot evaluate alignment of ' .. utils.quote(field._name) ..
+              ' field.')
+      end
+
+      return align or 1
+    end
+
     local function dissect_field(ifield, field, idx)
       local sz = nil
       local raw = nil
       local val = nil
       local label = nil
       local sdiss = nil
+
+      local align = align_of(field)
+      if idx % align ~= 0 then
+        idx = idx + (align - idx % align)
+      end
 
       if field._type == 'packet' then
         raw = reverse and buf(0, math.ceil(idx / 8))

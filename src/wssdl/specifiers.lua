@@ -226,6 +226,13 @@ specifiers.field_types = {
     end
   };
 
+  align = {
+    _imbue = function(field, val)
+      field._align = val
+      return field
+    end
+  };
+
   accept = {
     _imbue = function(field, ...)
       field._accept = field._accept or {}
