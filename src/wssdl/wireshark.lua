@@ -324,7 +324,7 @@ ws.dissector = function (pkt, proto)
           if reverse then
             error('wssdl: Cannot evaluate the size of the footer field ' .. utils.quote(field._name))
           elseif #pkt._definition ~= ifield then
-            local res, err = dissect_pkt(pkt, buf:len(), buf,
+            local res, err = dissect_pkt(pkt, buf:len() * 8, buf,
                 pinfo, #pkt._definition, ifield + 1, true)
 
             -- Handle errors
@@ -350,11 +350,11 @@ ws.dissector = function (pkt, proto)
         end
 
         local offlen = math.ceil((sz + idx % 8) / 8)
-        local needed = reverse and math.ceil(idx / 8) - offlen
+        local needed = reverse and math.ceil(idx / 8)
                                or  math.floor(idx / 8) + offlen
 
         raw = buf(0,0)
-        if sz > 0 and needed > buf:len() or needed < 0 then
+        if sz > 0 and needed > buf:len() or needed < offlen then
           if needed < 0 then
             needed = buf:len() - needed
           end
@@ -362,7 +362,7 @@ ws.dissector = function (pkt, proto)
         end
 
         if needed <= buf:len() and sz > 0 then
-          raw = buf(math.floor(idx / 8), offlen)
+          raw = buf(reverse and math.ceil(idx / 8) - offlen or math.floor(idx / 8), offlen)
         end
 
         if field._type == 'payload' then
