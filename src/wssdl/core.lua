@@ -228,7 +228,10 @@ make_dissectdef_placeholder = function(ctx, k)
       local method = t._path[#t._path]
       t._path[#t._path] = nil
       local tname = table.concat(t._path, '.')
-      local dt = DissectorTable.get(tname)
+      local ok, dt = pcall(DissectorTable.get, tname)
+      if not ok then
+        error('wssdl: DissectorTable ' .. utils.quote(tname) .. ' does not exist.', 2)
+      end
       for k, v in pairs(params) do
         dt[method](dt, k, v)
       end

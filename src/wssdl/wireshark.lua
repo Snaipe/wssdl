@@ -20,15 +20,6 @@ local ws = {}
 
 local utils = require 'wssdl.utils'
 
-local known_dissectors = {}
-
-do
-  local dissectors = DissectorTable.list()
-  for i, v in ipairs(dissectors) do
-    known_dissectors[v] = true
-  end
-end
-
 ws.make_fields = function (fields, pkt, prefix)
   local prefix = prefix or ''
 
@@ -459,7 +450,10 @@ ws.dissector = function (pkt, proto)
               table.concat({string.lower(proto.name),
                             unpack(field._dissection_criterion)}, '.')
 
-          local dt = DissectorTable.get(dtname)
+          local ok, dt = pcall(DissectorTable.get, dtname)
+          if not ok then
+            error('wssdl: DissectorTable ' .. utils.quote(dtname) .. ' does not exist.')
+          end
           local val = pktval.val
           for i, v in pairs(field._dissection_criterion) do
             val = val[v]
@@ -634,7 +628,7 @@ ws.proto = function (pkt, name, description)
         local tfield = target._definition[target._lookup[v]]
         if j < #criterion then
           if tfield._type ~= 'packet' then
-            error('wssdl: DissectorTable key ' .. utils.quote(dtname) .. ' does not match a field', 2)
+            error('wssdl: DissectorTable key ' .. utils.quote(dtname) .. ' does not match a field.', 2)
           end
           target = tfield._packet
         else
@@ -642,9 +636,9 @@ ws.proto = function (pkt, name, description)
         end
         j = j + 1
       end
-      if not known_dissectors[dtname] then
+      local ok = pcall(DissectorTable.get, dtname)
+      if not ok then
         DissectorTable.new(dtname, nil, target._ftype)
-        known_dissectors[dtname] = true
       end
     end
   end
