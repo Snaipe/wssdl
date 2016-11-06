@@ -86,6 +86,20 @@ local new_field_placeholder = function(id, field)
   return ph
 end
 
+local new_wsfield_placeholder = function(id, field)
+  local ph = new_placeholder (function(self, values)
+      local ok, res = pcall(self._wsfield)
+      if ok then
+        return res()
+      else
+        return self
+      end
+    end)
+  ph._id = id
+  ph._wsfield = field
+  return ph
+end
+
 local new_subscript_placeholder = function(parent, subscript, field)
   local ph = new_placeholder (function(self, values)
       return do_eval(self._parent, values)[self._id]
@@ -181,20 +195,29 @@ placeholder_metatable = {
       return nil
     end
 
-    if t._field._type ~= 'packet' then
-      error('wssdl: Symbol ' .. utils.quote(t._id) .. ' is not subscriptable.', 2)
-    end
-
-    local fidx = t._field._packet._lookup[k]
-    if not fidx then
-      local path, e = '', t
-      while t do
-        path = t._id .. '.' .. path
-        t = t._parent
+    if t._field then
+      if t._field._type ~= 'packet' then
+        error('wssdl: Symbol ' .. utils.quote(t._id) .. ' is not subscriptable.', 2)
       end
-      error('wssdl: Symbol ' .. utils.quote(path:sub(1, #path - 1)) .. ' has no member named ' .. utils.quote(k) .. '.', 2)
+
+      local fidx = t._field._packet._lookup[k]
+      if not fidx then
+        local path, e = '', t
+        while t do
+          path = t._id .. '.' .. path
+          t = t._parent
+        end
+        error('wssdl: Symbol ' .. utils.quote(path:sub(1, #path - 1)) .. ' has no member named ' .. utils.quote(k) .. '.', 2)
+      end
+      return new_subscript_placeholder(t, k, t._field._packet._definition[fidx])
+    elseif t._wsfield then
+      local id = t._id .. '.' .. k
+      local ok, res = pcall(Field.new, id)
+      if not ok then
+        error('wssdl: Symbol ' .. utils.quote(t._id) .. ' has no member named ' .. utils.quote(k) .. '.', 2)
+      end
+      return new_wsfield_placeholder(id, res)
     end
-    return new_subscript_placeholder(t, k, t._field._packet._definition[fidx])
   end;
 
   __unm = function(val)
@@ -334,10 +357,17 @@ placeholder.metatable = function(defenv, packetdef_metatable, make_pktfield)
 
       local env = setmetatable({}, {
         __index = function(t, k)
+          local ph
           if pktdef[k] == nil then
-            error('wssdl: Unknown symbol ' .. utils.quote(k) .. '.', 2)
+            local ok, res = pcall(Field.new, k)
+            if not ok then
+              error('wssdl: Unknown symbol ' .. utils.quote(k) .. '.', 2)
+            end
+            ph = new_wsfield_placeholder(k, res)
+          else
+            ph = new_field_placeholder(k, pktdef[k])
           end
-          return new_field_placeholder(k, pktdef[k])
+          return ph
         end;
       })
 
