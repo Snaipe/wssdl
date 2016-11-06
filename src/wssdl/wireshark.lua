@@ -20,96 +20,86 @@ local ws = {}
 
 local utils = require 'wssdl.utils'
 
+local function make_field (fields, prefix, field)
+  local len = #field
+
+  local function get_int_ftype(name)
+    return function()
+      return name .. tostring(len > 32 and 64 or math.ceil(len / 8) * 8)
+    end
+  end
+
+  local getftype = {
+
+    packet          = ftypes.STRING;
+    payload         = ftypes.PROTOCOL;
+    string_0        = ftypes.STRINGZ;
+    string          = ftypes.STRING;
+    bits_number     = get_int_ftype('UINT');
+    bits            = ftypes.UINT64;
+    float_32        = ftypes.FLOAT;
+    float_64        = ftypes.DOUBLE;
+    bytes           = ftypes.BYTES;
+    bool            = ftypes.BOOLEAN;
+    signed_number   = get_int_ftype('INT');
+    signed          = ftypes.INT64;
+    unsigned_number = get_int_ftype('UINT');
+    unsigned        = ftypes.UINT64;
+    address_32      = ftypes.IPv4;
+
+    address_128 = function()
+      -- Older versions of wireshark does not support ipv6 protofields in
+      -- their lua API. See https://code.wireshark.org/review/#/c/18442/
+      -- for a follow up on the patch to address this
+      if utils.semver(get_version()) >= utils.semver('2.3.0') then
+        return ftypes.IPv6
+      else
+        return ftypes.STRING
+      end
+    end;
+
+  }
+
+  if field._type == 'packet' then
+    -- No need to deepcopy the packet definition since the parent was cloned
+    local pkt = field._packet
+    pkt._properties.noclone = true
+    ws.make_fields(fields, pkt, prefix .. field._name .. '.')
+  end
+
+  local getter = getftype[field._type .. '_' .. type(len)]
+              or getftype[field._type .. '_' .. tostring(len)]
+              or getftype[field._type]
+
+  local ftype = type(getter) == 'function' and ftypes[getter()] or getter
+
+  local format = nil
+  if field._format ~= nil then
+    local corr = {
+      decimal     = base.DEC,
+      hexadecimal = base.HEX,
+      octal       = base.OCT,
+    }
+    format = corr[field._format]
+  end
+
+  fields[prefix .. field._name] = ProtoField.new(
+      field._displayname or field._name,
+      prefix .. field._name,
+      ftype,
+      nil,
+      format,
+      nil,
+      field._description)
+
+  field._ftype = ftype
+end
+
 ws.make_fields = function (fields, pkt, prefix)
   local prefix = prefix or ''
 
   for i, field in ipairs(pkt._definition) do
-    local ftype = nil
-    if field._type == 'packet' then
-      -- No need to deepcopy the packet definition since the parent was cloned
-      local pkt = field._packet
-      pkt._properties.noclone = true
-      ws.make_fields(fields, pkt, prefix .. field._name .. '.')
-      ftype = ftypes.STRING
-    elseif field._type == 'payload' then
-      ftype = ftypes.PROTOCOL
-    elseif field._type == 'string' then
-      local tname = 'STRING'
-      if type(field._size) == 'number' and field._size == 0 then
-        tname = tname .. 'Z'
-      end
-      ftype = ftypes[tname]
-    elseif field._type == 'address' then
-      if field._size == 32 then
-        ftype = ftypes.IPv4
-      else
-        -- Older versions of wireshark does not support ipv6 protofields in
-        -- their lua API. See https://code.wireshark.org/review/#/c/18442/
-        -- for a follow up on the patch to address this
-        if utils.semver(get_version()) >= utils.semver('2.3.0') then
-          ftype = ftypes.IPv6
-        else
-          ftype = ftypes.STRING
-        end
-      end
-    elseif field._type == 'bits' then
-      local len = #field
-      if type(len) == 'number' then
-        local tname = 'UINT' .. tostring(math.ceil(len / 8) * 8)
-        ftype = ftypes[tname]
-      else
-        ftype = ftypes.UINT64
-      end
-    elseif field._type == 'float' then
-      local len = #field
-      if type(len) ~= 'number' then
-        error('wssdl: Cannot compute size of primitive ' .. utils.quote(field._name) .. ' field.')
-      end
-      if len == 4 then
-        ftype = ftypes.FLOAT
-      else
-        ftype = ftypes.DOUBLE
-      end
-    else
-      local corr = {
-        signed   = 'INT',
-        unsigned = 'UINT',
-        bytes    = 'BYTES',
-        bool     = 'BOOLEAN',
-      }
-
-      local tname = corr[field._type]
-      if field._type == 'signed' or field._type == 'unsigned' then
-        local len = #field
-        if type(len) ~= 'number' then
-          error('wssdl: Cannot compute size of primitive ' .. utils.quote(field._name) .. ' field.')
-        end
-        tname = tname .. tostring(len > 32 and 64 or math.ceil(len / 8) * 8)
-      end
-
-      ftype = ftypes[tname]
-    end
-
-    local format = nil
-    if field._format ~= nil then
-      local corr = {
-        decimal = base.DEC,
-        hexadecimal = base.HEX,
-        octal = base.OCT,
-      }
-      format = corr[field._format]
-    end
-
-    fields[prefix .. field._name] = ProtoField.new(
-        field._displayname or field._name,
-        prefix .. field._name,
-        ftype,
-        nil,
-        format,
-        nil,
-        field._description)
-
-    field._ftype = ftype
+    make_field(fields, prefix, field)
   end
 end
 
