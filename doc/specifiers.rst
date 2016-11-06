@@ -90,22 +90,25 @@ Any variable declared with ``wssdl.packet`` can be used as a field type.
 Payload Type
 ~~~~~~~~~~~~
 
+``payload(<criterion>, [size])``
+
 The special payload type is used for packets that contains data that needs to
-be subdissected by another registered dissector. The specifier comes in three
-prototypes:
+be subdissected by another registered dissector.
 
-* ``payload { <field> }``
+The ``<criterion>`` parameter is either a field, or a 2-element table containing
+a field and a key:
 
-* ``payload { <field>, <key> }``
+* ``payload(<field>, [size])``
 
-* ``payload { <field>, <key>, <size> }``
+* ``payload({ <field>, <key> }, [size])``
 
-Where ``<field>`` is the field that should be used as the value to lookup the
-dissector table entry, ``<key>`` is the dissector table identifier, and
-``<size>`` is the size of the field in octets.
+``<field>`` is the field that should be used as the value to lookup the
+dissector table entry, ``<key>`` is the dissector table identifier.
 
 If ``<key>`` is nil or unspecified, then the dissector table identifier becomes
 ``<prototype name>.<field>``.
+
+``<size>`` is an optional parameter representing the size of the field in octets.
 
 If ``<size>`` is nil or unspecified, then the size of the field becomes the
 remaining packet size.
