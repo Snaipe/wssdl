@@ -99,7 +99,9 @@ ws.make_fields = function (fields, pkt, prefix)
   local prefix = prefix or ''
 
   for i, field in ipairs(pkt._definition) do
-    make_field(fields, prefix, field)
+    if not field._hidden then
+      make_field(fields, prefix, field)
+    end
   end
 end
 
@@ -225,12 +227,17 @@ ws.dissector = function (pkt, proto)
       local labels = pktval.label[field._name] or {}
       local val = pktval.val[field._name]
       local raw = pktval.buf[field._name]
+      local node
 
       if field._type == 'packet' then
         local pktval = { buf = raw, label = labels, val = val }
-        node = tree:add(protofield, raw._self, '', unpack(labels))
+        if field._hidden then
+          node = tree:add(protofield, raw._self, '', '')
+        else
+          node = tree:add(protofield, raw._self, '', unpack(labels))
+        end
         tree_add_fields(field._packet, prefix .. field._name .. '.', node, pktval)
-      else
+      elseif not field._hidden then
         node = tree:add(protofield, raw, val, unpack(labels))
       end
     end

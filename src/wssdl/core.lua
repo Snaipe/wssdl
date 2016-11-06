@@ -156,7 +156,7 @@ setmetatable(wssdl._packet, {
     local out = pkt._create(pkt, ...)
 
     for k, v in pairs(wssdl._current_def) do
-      if k:sub(1,1) ~= '_' then
+      if type(v) == 'table' then
         v._pktdef = nil
       end
     end
@@ -278,7 +278,7 @@ setmetatable(wssdl, {
       newpacket._properties = newprops
       setmetatable(newpacket, getmetatable(wssdl._packet))
 
-      wssdl._current_def = { _pktdef = newpacket }
+      wssdl._current_def = {}
 
       -- Switch to the packet definition metatable
       local env = setmetatable({}, packetdef_metatable)

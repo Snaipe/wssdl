@@ -305,14 +305,24 @@ placeholder.metatable = function(defenv, packetdef_metatable, make_pktfield)
         return nil
       end
 
-      if field._name:sub(1,1) == '_' then
-        error('wssdl: Invalid identifier for field ' .. utils.quote(field._name) .. ': Fields must not start with an underscore', 3)
-      end
-      if wssdl._current_def[field._name] and wssdl._current_def[field._name] ~= field then
-        error('wssdl: Duplicate field ' .. utils.quote(field._name) .. ' in packet definition.', 3)
-      end
+      if wssdl._current_def[field._name] ~= field then
+        if wssdl._current_def[field._name] then
+          error('wssdl: Duplicate field ' .. utils.quote(field._name) .. ' in packet definition.', 3)
+        end
 
-      wssdl._current_def[field._name] = field
+        if field._name ~= '_' then
+          if field._name:sub(1,1) == '_' then
+            error('wssdl: Invalid identifier for field ' .. utils.quote(field._name) .. ': Fields must not start with an underscore', 3)
+          end
+        else
+          local i = wssdl._current_def._anonymous_counter or 1
+          field._name = '_anonymous_' .. i .. ''
+          wssdl._current_def._anonymous_counter = i + 1
+          field._hidden = true
+        end
+
+        wssdl._current_def[field._name] = field
+      end
 
       local type = rawget(specifiers.field_types, k)
       if type == nil then
