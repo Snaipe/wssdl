@@ -115,7 +115,7 @@ end
 
 local dissect_int_base = function(char, c64, mname)
   return function (field, buf, raw, idx, sz)
-    if idx % 8 > 0 then
+    if idx % 8 > 0 or sz % 8 > 0 then
       if sz > 64 then
         error('wssdl: Unaligned ' .. mname .. ' field ' .. utils.quote(field._name) ..
         ' is larger than 64 bits, which is not supported by wireshark.')
@@ -210,11 +210,6 @@ local dissect_type = {
 
   float = function (field, buf, raw, idx, sz)
     if idx % 8 > 0 then
-      if sz > 64 then
-        error('wssdl: Unaligned float field ' .. field._name ..
-              ' is larger than 64 bits, which is not supported by wireshark.')
-      end
-
       local fmt = (field._le and '<' or '>') .. (sz == 64 and 'd' or 'f')
       local packed = Struct.pack(sz == 64 and '>E' or '>I4', raw:bitfield(idx % 8, sz))
       return raw, Struct.unpack(fmt, packed), sz
