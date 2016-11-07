@@ -329,6 +329,14 @@ placeholder.metatable = function(defenv, packetdef_metatable, make_pktfield)
         type = rawget(wssdl.env, k)
       end
       if type == nil then
+        for i, v in ipairs(wssdl._locals) do
+          if v[1] == k then
+            type = v[2]
+            break
+          end
+        end
+      end
+      if type == nil then
         type = debug.find_local(3, k)
       end
       if type == nil then

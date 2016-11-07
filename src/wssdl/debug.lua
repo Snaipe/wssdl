@@ -152,12 +152,12 @@ end
 debug.set_locals = function(lvl, locals)
   local i = 1
   while true do
-    if locals[i] == nil then
-      break
-    end
-    local name = luadebug.setlocal(lvl, i, locals[i][2])
+    local name = luadebug.getlocal(lvl, i)
     if not name then
       break
+    end
+    if locals[i] ~= nil then
+      luadebug.setlocal(lvl, i, locals[i][2])
     end
     i = i + 1
   end
