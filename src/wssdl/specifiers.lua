@@ -51,7 +51,7 @@ local string_type = function(basesz, nullterm)
     _imbue = function(field, size)
       if nullterm then
         field._size = 0
-      else
+      elseif size then
         field._size = size * basesz * 8
       end
       field._type = "string"
