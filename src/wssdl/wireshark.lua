@@ -169,7 +169,7 @@ local dissect_type = {
     local val = raw[mname](raw)
     sz = #val * 8
 
-    if not field._size or field._size == 0 then
+    if field._size == 0 then
       sz = sz + field._basesz * 8
     end
     return raw, val, sz
