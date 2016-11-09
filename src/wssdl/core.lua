@@ -30,6 +30,21 @@ local initenv = function ()
   wssdl.env, wssdl.fenv = debug.getfenv(4)
 end
 
+local function get_params(...)
+  local params = {...}
+  if #params == 1 and type(params[1]) == 'table' then
+    params = params[1]
+  end
+  if params.args == nil then
+    params.args = {}
+    for i, v in ipairs(params) do
+      params.args[i] = v
+      params[i] = nil
+    end
+  end
+  return params
+end
+
 wssdl._alias = {
 
   _create = function(pkt, def)
@@ -39,17 +54,7 @@ wssdl._alias = {
       _field = def[1],
 
       _imbue = function (target, ...)
-        local params = {...}
-        if #params == 1 and type(params[1]) == 'table' then
-          params = params[1]
-        end
-        if params.args == nil then
-          params.args = {}
-          for i, v in ipairs(params) do
-            params.args[i] = v
-            params[i] = nil
-          end
-        end
+        local params = get_params(...)
         local field = utils.deepcopy(alias._field):_eval(params)
 
         -- Don't copy fields in the blacklist
@@ -86,7 +91,8 @@ wssdl._packet = {
       _properties = pkt._properties,
 
       _imbue = function (field, ...)
-        local pkt = newpacket:eval({...})
+        local params = get_params(...)
+        local pkt = newpacket:eval(params)
         field._type    = "packet"
         field._packet  = pkt
         return field
