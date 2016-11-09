@@ -119,9 +119,10 @@ debug.find_local = function(lvl, n)
   end
 
   -- Search upvalues at specified stack level
+  local sl = luadebug.getinfo(lvl).func
   i = 1
   while true do
-    local name, val = luadebug.getupvalue(lvl, i)
+    local name, val = luadebug.getupvalue(sl, i)
     if not name then
       break
     end
