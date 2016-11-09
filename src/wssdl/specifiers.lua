@@ -20,7 +20,8 @@ local specifiers = {}
 
 local utils = require 'wssdl.utils'
 
-local type_specifier = function (type, basesz)
+local type_specifier = function (type, basesz, align)
+  local align = align or 1
   local o = {
     _imbue = function (field, s)
       if s then
@@ -29,17 +30,20 @@ local type_specifier = function (type, basesz)
         field._size = nil
       end
       field._type = type
+      field._align = align
       return field
     end
   }
   return o
 end
 
-local type_specifier_sized = function (type, size)
+local type_specifier_sized = function (type, size, align)
+  local align = align or 1
   local o = {
     _imbue = function (field)
       field._size = size
       field._type = type
+      field._align = align
       return field
     end
   }
@@ -56,6 +60,7 @@ local string_type = function(basesz, nullterm)
       end
       field._type = "string"
       field._basesz = basesz
+      field._align = 8
       return field
     end
   }
@@ -73,7 +78,7 @@ end
 
 specifiers.field_types = {
   bits  = type_specifier("bits",      1);
-  bytes = type_specifier("bytes",     8);
+  bytes = type_specifier("bytes",     8, 8);
   int   = type_specifier("signed",    1);
   uint  = type_specifier("unsigned",  1);
 
@@ -94,8 +99,8 @@ specifiers.field_types = {
   f32 = type_specifier_sized("float", 32);
   f64 = type_specifier_sized("float", 64);
 
-  ipv4 = type_specifier_sized("address", 32);
-  ipv6 = type_specifier_sized("address", 128);
+  ipv4 = type_specifier_sized("address", 32, 8);
+  ipv6 = type_specifier_sized("address", 128, 8);
 
   utf8   = string_type(1, false);
   utf8z  = string_type(1, true);
