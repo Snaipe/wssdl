@@ -71,7 +71,10 @@ local function make_field (fields, prefix, field)
               or getftype[field._type .. '_' .. tostring(len)]
               or getftype[field._type]
 
-  local ftype = type(getter) == 'function' and ftypes[getter()] or getter
+  local ftype = type(getter) == 'function' and getter() or getter
+  if type(ftype) == 'string' then
+    ftype = ftypes[ftype]
+  end
 
   local format = nil
   if field._format ~= nil then

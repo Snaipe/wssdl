@@ -171,10 +171,14 @@ wssdl._packet = {
   _calcsize = function(pkt)
     local sz = 0
     if pkt._properties.size > 0 then
-      sz = tonumber(pkt.size)
+      sz = tonumber(pkt._properties.size)
     else
       for _, v in ipairs(pkt._definition) do
-        sz = sz + #v
+        local len = #v
+        if not len then
+          return nil
+        end
+        sz = sz + len
       end
     end
     if pkt._properties.padding > 0 then
@@ -196,7 +200,7 @@ local packet_metatable = {
     -- The user environment is 3 stack levels up
     debug.set_locals(3, wssdl._locals)
 
-    local out = pkt._create(pkt, ...)
+    local out = pkt:_create(...)
 
     for k, v in pairs(wssdl._current_def) do
       if type(v) == 'table' then
@@ -315,7 +319,7 @@ setmetatable(wssdl, {
   __index = function(t, k)
     initenv()
 
-    local function make_wrapper(name)
+    local function make_wrapper(name, level)
       -- Create a new packet factory based off wssdl._packet
       local newdef = utils.deepcopy(wssdl['_' .. name])
       wssdl._current_def = {}
@@ -324,13 +328,13 @@ setmetatable(wssdl, {
       local env = setmetatable({}, packetdef_metatable)
       debug.setfenv(wssdl.fenv, env)
       -- The user environment is 3 stack levels up
-      wssdl._locals = debug.get_locals(3)
-      debug.reset_locals(3, nil, make_packetdef_placeholder)
+      wssdl._locals = debug.get_locals(level)
+      debug.reset_locals(level, nil, make_packetdef_placeholder)
       return newdef
     end
 
     if k == 'packet' or k == 'alias' then
-      return make_wrapper(k)
+      return make_wrapper(k, 3)
     elseif k == 'dissect' then
       local newdissect = {}
 
