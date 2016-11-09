@@ -31,6 +31,7 @@ local function make_field (fields, prefix, field)
 
   local getftype = {
 
+    field           = ftypes.STRING;
     packet          = ftypes.STRING;
     payload         = ftypes.PROTOCOL;
     string_0        = ftypes.STRINGZ;
@@ -243,7 +244,17 @@ ws.dissector = function (pkt, proto)
         end
         tree_add_fields(field._packet, prefix .. field._name .. '.', node, pktval)
       elseif not field._hidden then
-        node = tree:add(protofield, raw, val, unpack(labels))
+        if field._type == 'field' then
+          local id = tostring(labels)
+          local pf = proto.fields[prefix .. id]
+          if pf then
+            node = tree:add(pf, raw, val)
+          else
+            node = tree:add(protofield, raw, val, id .. ':', tostring(val))
+          end
+        else
+          node = tree:add(protofield, raw, val, unpack(labels))
+        end
       end
     end
   end
@@ -368,7 +379,7 @@ ws.dissector = function (pkt, proto)
         idx = idx + (align - idx % align)
       end
 
-      if field._type == 'packet' then
+      if field._type == 'packet' or field._type == 'field' then
         raw = reverse and buf(0, math.ceil(idx / 8))
                       or buf(math.floor(idx / 8))
 
@@ -386,14 +397,20 @@ ws.dissector = function (pkt, proto)
         if reverse then
           sz = -sz
         end
-        local procsz = math.ceil((sz + idx % 8) / 8)
-        val.buf._self = reverse and buf(math.floor(idx / 8) - procsz, procsz)
-                                or buf(math.floor(idx / 8), procsz)
-        raw = val.buf
-        label = val.label
-        val = val.val
-        for k, v in pairs(sdiss) do
-          subdissect[#subdissect + 1] = v
+        if field._type == 'packet' then
+          local procsz = math.ceil((sz + idx % 8) / 8)
+          val.buf._self = reverse and buf(math.floor(idx / 8) - procsz, procsz)
+                                  or buf(math.floor(idx / 8), procsz)
+          raw = val.buf
+          label = val.label
+          val = val.val
+          for k, v in pairs(sdiss) do
+            subdissect[#subdissect + 1] = v
+          end
+        else
+          raw   = val.buf.value
+          label = tostring(val.val.id):lower()
+          val   = val.val.value
         end
       else
         sz = size_of(field)

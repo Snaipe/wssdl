@@ -83,6 +83,8 @@ wssdl._packet = {
     desegment = false,    -- Whether the packet should be desegmented or not
   };
 
+  _type = 'packet';
+
   _create = function(pkt, def)
     local newpacket = {}
 
@@ -90,11 +92,12 @@ wssdl._packet = {
       _definition = def,
       _values = {},
       _properties = pkt._properties,
+      _type = pkt._type,
 
       _imbue = function (field, ...)
         local params = get_params(...)
         local pkt = newpacket:eval(params)
-        field._type    = "packet"
+        field._type    = newpacket._type
         field._packet  = pkt
         return field
       end;
@@ -191,6 +194,23 @@ wssdl._packet = {
 
 }
 
+wssdl._field = utils.copy(wssdl._packet)
+wssdl._field.desegment = nil
+
+wssdl._field._create = function(pkt, def)
+  local missing = { id = true, value = true }
+  for i, v in ipairs(def) do
+    missing[v._name] = nil
+  end
+  for k, v in pairs(missing) do
+    error('wssdl: Complex fields must have an ' .. utils.quote(k) .. ' field.', 2)
+  end
+
+  return wssdl._packet._create(pkt, def)
+end
+
+wssdl._field._type = 'field'
+
 wssdl._current_def = nil
 
 local packet_metatable = {
@@ -216,6 +236,7 @@ local packet_metatable = {
 
 setmetatable(wssdl._packet, packet_metatable)
 setmetatable(wssdl._alias, packet_metatable)
+setmetatable(wssdl._field, packet_metatable)
 
 local packetdef_metatable = nil
 
@@ -334,7 +355,7 @@ setmetatable(wssdl, {
       return newdef
     end
 
-    if k == 'packet' or k == 'alias' then
+    if k == 'packet' or k == 'alias' or k == 'field' then
       return make_wrapper(k, 3)
     elseif k == 'dissect' then
       local newdissect = {}
