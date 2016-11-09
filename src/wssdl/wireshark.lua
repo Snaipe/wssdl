@@ -153,7 +153,7 @@ local dissect_type = {
 
   string = function (field, buf, raw, idx, sz, reverse)
     local mname = 'string'
-    if not field._size or field._size == 0 then
+    if field._size == 0 then
       if reverse then
         error('wssdl: Null-terminated strings cannot logically be used as suffix fields.')
       end
@@ -220,6 +220,8 @@ local dissect_type = {
 dissect_type.bool = dissect_type.bits;
 
 ws.dissector = function (pkt, proto)
+
+  local prop_desegment = pkt._properties.desegment
 
   local function tree_add_fields(pkt, prefix, tree, pktval)
     for i, field in ipairs(pkt._definition) do
@@ -338,7 +340,10 @@ ws.dissector = function (pkt, proto)
             idx = idx + align
           end
           if not found then
-            error('wssdl: Valued field ' .. utils.quote(field._name) .. ' could not be found in the payload')
+            if not prop_desegment then
+              error('wssdl: Valued field ' .. utils.quote(field._name) .. ' could not be found in the payload')
+            end
+            return -1
           end
           start = idx
           iend = i - 1
@@ -396,6 +401,9 @@ ws.dissector = function (pkt, proto)
           elseif #pkt._definition ~= ifield then
             -- Get to the end or the next value field
             local start, iend = find_valued_field_after(ifield)
+            if start == -1 then
+              return nil, {desegment = DESEGMENT_ONE_MORE_SEGMENT}
+            end
             local res, err = dissect_pkt(pkt, start, buf,
                 pinfo, iend, ifield + 1, true)
 
@@ -473,8 +481,8 @@ ws.dissector = function (pkt, proto)
 
         local res, err = dissect_field(i, field, idx)
         if err then
-          if err.needed > 0 then
-            if pkt._properties.desegment then
+          if err.needed and err.needed > 0 then
+            if prop_desegment and not err.desegment then
               local desegment = (err.needed - buf:len()) * 8
               for j = i + 1, #pkt._definition do
                 local len = #pkt._definition[j]
@@ -535,7 +543,7 @@ ws.dissector = function (pkt, proto)
 
     local res, err = dissect_pkt(pkt, 0, buf, pinfo, 1, #pkt._definition, false)
     if err and err.desegment then
-      return len, desegment
+      return -1, err.desegment
     end
 
     pinfo.cols.protocol = proto.name
@@ -560,14 +568,14 @@ ws.dissector = function (pkt, proto)
       end
     end
 
-    return math.ceil(len / 8), desegment
+    return math.ceil(len / 8)
   end
 
   return function(buf, pinfo, root)
     local pktlen = buf:len()
     local consumed = 0
 
-    if pkt._properties.desegment then
+    if prop_desegment then
       while consumed < pktlen do
         local result, desegment = dissect_proto(pkt, buf(consumed):tvb(), pinfo, root)
         if result > 0 then
