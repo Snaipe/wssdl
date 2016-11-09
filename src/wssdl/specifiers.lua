@@ -76,6 +76,18 @@ local format_specifier = function(fmt)
   return o
 end
 
+local default_transforms = {
+  [ftypes.BOOLEAN] = function(e) return not not e end,
+}
+
+for k, v in pairs(ftypes) do
+  if k:sub(1,6) == 'STRING' then
+    default_transforms[v] = function(e) return tostring(e) end
+  elseif k:sub(1,3) == 'INT' or k:sub(1,4) == 'UINT' then
+    default_transforms[v] = function(e) return tonumber(e) end
+  end
+end
+
 specifiers.field_types = {
   bits  = type_specifier("bits",      1);
   bytes = type_specifier("bytes",     8, 8);
@@ -268,6 +280,17 @@ specifiers.field_types = {
         else
           field._reject[#field._reject + 1] = function(e) return type(e) ~= type(p) or p ~= e end
         end
+      end
+      return field
+    end
+  };
+
+  transform = {
+    _imbue = function(field, ftype, transform)
+      field._ftype = ftype
+      field._transform = transform or default_transforms[ftype]
+      if not field._transform then
+        error('wssdl: Cannot find a default transform for this ftype.', 2)
       end
       return field
     end
