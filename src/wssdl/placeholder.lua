@@ -138,6 +138,10 @@ local new_mod_placeholder = new_binop_placeholder (function(self, values)
     return do_eval(self._lhs, values) % do_eval(self._rhs, values)
   end)
 
+local new_len_placeholder = new_valued_placeholder (function(self, values)
+    return #do_eval(self._value, values)
+  end)
+
 -- Bitwise ops
 
 local new_band_placeholder = new_binop_placeholder (function(self, values)
@@ -246,6 +250,10 @@ placeholder_metatable = {
 
   __mod = function(lhs, rhs)
     return new_mod_placeholder(lhs, rhs)
+  end;
+
+  __len = function(val)
+    return new_len_placeholder(val)
   end;
 
   __band = function(lhs, rhs)
