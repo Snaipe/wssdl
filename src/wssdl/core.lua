@@ -28,6 +28,7 @@ local debug       = require 'wssdl.debug'
 local initenv = function ()
   -- The user environment is 4 stack levels up
   wssdl.env, wssdl.fenv = debug.getfenv(4)
+  wssdl.genv = _G
 end
 
 local function get_params(...)

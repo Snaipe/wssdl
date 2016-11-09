@@ -363,6 +363,9 @@ placeholder.metatable = function(defenv, packetdef_metatable, make_pktfield)
         type = rawget(wssdl.env, k)
       end
       if type == nil then
+        type = rawget(wssdl.genv, k)
+      end
+      if type == nil then
         for i, v in ipairs(wssdl._locals) do
           if v[1] == k then
             type = v[2]
@@ -416,6 +419,15 @@ placeholder.metatable = function(defenv, packetdef_metatable, make_pktfield)
           elseif pktdef[k] == nil then
             local ok, res = pcall(Field.new, k)
             if not ok then
+              -- Check if the referenced symbol isn't in the original environment
+              local orig = rawget(wssdl.env, k)
+              if orig ~= nil then
+                return orig
+              end
+              orig = rawget(wssdl.genv, k)
+              if orig ~= nil then
+                return orig
+              end
               error('wssdl: Unknown symbol ' .. utils.quote(k) .. '.', 2)
             end
             ph = new_wsfield_placeholder(k, res)
