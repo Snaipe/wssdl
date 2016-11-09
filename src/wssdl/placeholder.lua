@@ -86,6 +86,19 @@ local new_field_placeholder = function(id, field)
   return ph
 end
 
+local new_var_placeholder = function(id)
+  local ph = new_placeholder (function(self, values)
+      local val = values[self._id]
+      if val ~= nil then
+        return val
+      else
+        return new_var_placeholder(self._id)
+      end
+    end)
+  ph._id = id
+  return ph
+end
+
 local new_wsfield_placeholder = function(id, field)
   local ph = new_placeholder (function(self, values)
       local ok, res = pcall(self._wsfield)
@@ -107,6 +120,15 @@ local new_subscript_placeholder = function(parent, subscript, field)
   ph._parent = parent
   ph._id = subscript
   ph._field = field
+  return ph
+end
+
+local new_val_subscript_placeholder = function(parent, subscript)
+  local ph = new_placeholder (function(self, values)
+      return do_eval(self._parent, values)[self._id]
+    end)
+  ph._parent = parent
+  ph._id = subscript
   return ph
 end
 
@@ -197,6 +219,10 @@ placeholder_metatable = {
     -- Do not resolve underscore-prefixed fields
     if string.sub(k, 1, 1) == '_' then
       return nil
+    end
+
+    if not t._field and not t._wsfield then
+      return new_val_subscript_placeholder(t, k)
     end
 
     if t._field then
@@ -384,7 +410,10 @@ placeholder.metatable = function(defenv, packetdef_metatable, make_pktfield)
       local env = setmetatable({}, {
         __index = function(t, k)
           local ph
-          if pktdef[k] == nil then
+          local special_vars = { args = true }
+          if special_vars[k] then
+            ph = new_var_placeholder(k)
+          elseif pktdef[k] == nil then
             local ok, res = pcall(Field.new, k)
             if not ok then
               error('wssdl: Unknown symbol ' .. utils.quote(k) .. '.', 2)

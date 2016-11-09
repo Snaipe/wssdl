@@ -30,6 +30,43 @@ local initenv = function ()
   wssdl.env, wssdl.fenv = debug.getfenv(4)
 end
 
+wssdl._alias = {
+
+  _create = function(pkt, def)
+    local alias
+
+    alias = {
+      _field = def[1],
+
+      _imbue = function (target, ...)
+        local params = {...}
+        if #params == 1 and type(params[1]) == 'table' then
+          params = params[1]
+        end
+        if params.args == nil then
+          params.args = {}
+          for i, v in ipairs(params) do
+            params.args[i] = v
+            params[i] = nil
+          end
+        end
+        local field = utils.deepcopy(alias._field):_eval(params)
+
+        -- Don't copy fields in the blacklist
+        local blacklist = { _name = true }
+        for k, v in pairs(field) do
+          if not blacklist[k] then
+            target[k] = v
+          end
+        end
+        return field
+      end;
+    }
+    return alias
+  end;
+
+}
+
 local make_fields = nil
 
 wssdl._packet = {
@@ -145,7 +182,7 @@ wssdl._packet = {
 
 wssdl._current_def = nil
 
-setmetatable(wssdl._packet, {
+local packet_metatable = {
 
   __call = function(pkt, ...)
     -- Restore the original global metatable
@@ -164,7 +201,10 @@ setmetatable(wssdl._packet, {
     return out
   end;
 
-})
+}
+
+setmetatable(wssdl._packet, packet_metatable)
+setmetatable(wssdl._alias, packet_metatable)
 
 local packetdef_metatable = nil
 
@@ -268,16 +308,10 @@ setmetatable(wssdl, {
 
   __index = function(t, k)
     initenv()
-    if k == 'packet' then
+
+    local function make_wrapper(name)
       -- Create a new packet factory based off wssdl._packet
-      local newpacket = {}
-      for k, v in pairs(wssdl._packet) do newpacket[k] = v end
-
-      local newprops = {}
-      for k, v in pairs(wssdl._packet._properties) do newprops[k] = v end
-      newpacket._properties = newprops
-      setmetatable(newpacket, getmetatable(wssdl._packet))
-
+      local newdef = utils.deepcopy(wssdl['_' .. name])
       wssdl._current_def = {}
 
       -- Switch to the packet definition metatable
@@ -286,7 +320,11 @@ setmetatable(wssdl, {
       -- The user environment is 3 stack levels up
       wssdl._locals = debug.get_locals(3)
       debug.reset_locals(3, nil, make_packetdef_placeholder)
-      return newpacket
+      return newdef
+    end
+
+    if k == 'packet' or k == 'alias' then
+      return make_wrapper(k)
     elseif k == 'dissect' then
       local newdissect = {}
 
