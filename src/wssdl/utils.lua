@@ -32,16 +32,22 @@ utils.copy = function (o)
 end
 
 utils.deepcopy = function (o)
-  if type(o) == 'table' then
-    local copy = {}
-    for k, v in pairs(o) do
-      copy[k] = utils.deepcopy(v)
+  local cache = {}
+
+  local function _clone(o)
+    if type(o) == 'table' then
+      local copy = {}
+      for k, v in pairs(o) do
+        copy[k] = cache[v] or utils.deepcopy(v)
+      end
+      setmetatable(copy, getmetatable(o))
+      cache[o] = copy
+      return copy
+    else
+      return o
     end
-    setmetatable(copy, getmetatable(o))
-    return copy
-  else
-    return o
   end
+  return _clone(o)
 end
 
 utils.quote = function (s)
