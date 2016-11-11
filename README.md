@@ -4,6 +4,7 @@
 [![License (GPL)](https://img.shields.io/badge/license-GPLv3-blue.svg)](https://github.com/diacritic/wssdl/blob/master/LICENSE) 
 [![Version (Experimental)](https://img.shields.io/github/release/diacritic/wssdl.svg?label=version)](https://github.com/diacritic/wssdl/releases/latest) 
 [![Language (Lua)](https://img.shields.io/badge/powered_by-Lua-brightgreen.svg)](https://lua.org) 
+[![Gitter chat](https://badges.gitter.im/diacritic/wssdl.png)](https://gitter.im/diacritic/wssdl) 
 
 Wireshark-Specific Dissector Language
 
