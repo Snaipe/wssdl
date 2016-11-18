@@ -36,7 +36,7 @@ Also check out some of the [samples][samples].
 
 Grab the bootstrapped `wssdl.lua` from the [latest release][latest],
 and put it in your Wireshark Plugin directory
-(usually ~/.config/wireshark/plugins or /usr/lib/wireshark/<version>)
+(usually `~/.config/wireshark/plugins`, `~/.wireshark/plugins` or `/usr/lib/wireshark/<version>`)
 
 ### From source
 
