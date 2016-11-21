@@ -115,4 +115,12 @@ utils.tvb_ipv6 = function (tvb)
   return ip
 end
 
+utils.tvb_ether = function (tvb)
+  local addr = {}
+  for i=0,5 do
+    addr[#addr + 1] = string.format('%x', tvb(i,1):uint())
+  end
+  return table.concat(addr, ':')
+end
+
 return utils

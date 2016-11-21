@@ -77,6 +77,9 @@ Type         Description
 ------------ -------------------------------------------------------------------
 ``ipv6()``   IPv6 address.
              If used, the field must be aligned on an octet boundary.
+------------ -------------------------------------------------------------------
+``ether()``  Ethernet address.
+             If used, the field must be aligned on an octet boundary.
 ============ ===================================================================
 
 Special Field Types

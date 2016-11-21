@@ -47,8 +47,19 @@ local function make_field (fields, prefix, field)
     unsigned        = ftypes.UINT64;
     address_32      = ftypes.IPv4;
 
+    address_48 = function()
+      -- Older versions of wireshark do not support ethernet protofields in
+      -- their lua API. See https://code.wireshark.org/review/#/c/18917/
+      -- for a follow up on the patch to address this
+      if utils.semver(get_version()) >= utils.semver('2.3.0') then
+        return ftypes.ETHER
+      else
+        return ftypes.STRING
+      end
+    end;
+
     address_128 = function()
-      -- Older versions of wireshark does not support ipv6 protofields in
+      -- Older versions of wireshark do not support ipv6 protofields in
       -- their lua API. See https://code.wireshark.org/review/#/c/18442/
       -- for a follow up on the patch to address this
       if utils.semver(get_version()) >= utils.semver('2.3.0') then
@@ -175,18 +186,36 @@ local dissect_type = {
     return raw, val, sz
   end;
 
-  address = function (field, buf, raw, idx, sz)
-    local mname = sz == 32 and 'ipv4' or 'ipv6'
+  address_32 = function (field, buf, raw, idx, sz)
+    return raw, raw:ipv4(), sz, label
+  end;
+
+  address_48 = function (field, buf, raw, idx, sz)
     local val
 
-    -- Older versions of wireshark does not support ipv6 protofields in
+    -- Older versions of wireshark do not support ether protofields in
+    -- their lua API. See https://code.wireshark.org/review/#/c/18917/
+    -- for a follow up on the patch to address this
+    if utils.semver(get_version()) < utils.semver('2.3.0') then
+      val = utils.tvb_ether(raw)
+      label = {(field._displayname or field._name) .. ': ', val}
+    else
+      val = raw:ether()
+    end
+    return raw, val, sz, label
+  end;
+
+  address_128 = function (field, buf, raw, idx, sz)
+    local val
+
+    -- Older versions of wireshark do not support ipv6 protofields in
     -- their lua API. See https://code.wireshark.org/review/#/c/18442/
     -- for a follow up on the patch to address this
-    if utils.semver(get_version()) < utils.semver('2.3.0') and mname == 'ipv6' then
+    if utils.semver(get_version()) < utils.semver('2.3.0') then
       val = utils.tvb_ipv6(raw)
       label = {(field._displayname or field._name) .. ': ', val}
     else
-      val = raw[mname](raw)
+      val = raw:ipv6()
     end
     return raw, val, sz, label
   end;
@@ -467,7 +496,11 @@ ws.dissector = function (pkt, proto)
           end
           subdissect[#subdissect + 1] = {dt = dt, tvb = raw:tvb(), val = val}
         else
-          local df = dissect_type[field._type] or dissect_type.default
+          local df = dissect_type[field._type .. '_' .. type(sz)]
+                  or dissect_type[field._type .. '_' .. tostring(sz)]
+                  or dissect_type[field._type]
+                  or dissect_type.default
+
           raw, val, sz, label = df(field, buf, raw, idx, sz, reverse)
         end
       end

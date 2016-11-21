@@ -101,6 +101,7 @@ specifiers.field_types = {
 
   ipv4 = type_specifier_sized("address", 32, 8);
   ipv6 = type_specifier_sized("address", 128, 8);
+  ether = type_specifier_sized("address", 48, 8);
 
   utf8   = string_type(1, false);
   utf8z  = string_type(1, true);
