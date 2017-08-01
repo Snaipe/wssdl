@@ -72,7 +72,7 @@ local new_funcall_placeholder = function(func, ...)
   return ph
 end
 
-local new_field_placeholder = function(id, field)
+local function new_field_placeholder(id, field)
   local ph = new_placeholder (function(self, values)
       local val = values[self._id]
       if val ~= nil then
