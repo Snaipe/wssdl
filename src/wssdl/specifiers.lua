@@ -185,8 +185,9 @@ specifiers.field_types = {
         if f then
           local idx = f._lookup[v]
           if idx then
+            f = f._definition[idx]
             if i < #criterion then
-              f = rawget(f._definition[idx], '_packet')
+              f = rawget(f, '_packet')
             end
           else
             f = nil
